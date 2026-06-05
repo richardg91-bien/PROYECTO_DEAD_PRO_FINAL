@@ -5,7 +5,7 @@ import qrcode
 
 from app.db import get_db, init_db
 from app.supabase_client import supabase
-from ia_service import generar_embedding
+from app.ia_service import generar_embedding
 
 main = Blueprint("main", __name__)
 

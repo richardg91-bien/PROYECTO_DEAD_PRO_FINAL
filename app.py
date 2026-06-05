@@ -184,7 +184,71 @@ def experiencia(id):
 
     return render_template("experiencia.html", item=item)
 
+@app.route("/chat", methods=["GET", "POST"])
+def chat():
 
+    if request.method == "GET":
+        return render_template("chat.html")
+
+    mensaje = request.form.get("message", "")
+
+    respuesta = ""
+
+    if mensaje:
+        try:
+            r = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "user", "content": mensaje}
+                ]
+            )
+
+            respuesta = r.choices[0].message.content
+
+        except Exception as e:
+            print(e)
+            respuesta = "Error al consultar IA"
+
+    return render_template(
+        "chat.html",
+        mensaje=mensaje,
+        respuesta=respuesta
+    )
+
+
+@app.route("/buscar_ia", methods=["GET", "POST"])
+def buscar_ia():
+
+    if request.method == "GET":
+        return render_template("buscar_ia.html")
+
+    consulta = request.form.get("consulta", "")
+
+    resultado = ""
+
+    if consulta:
+        try:
+            r = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": consulta
+                    }
+                ]
+            )
+
+            resultado = r.choices[0].message.content
+
+        except Exception as e:
+            print(e)
+            resultado = "Error al buscar"
+
+    return render_template(
+        "resultados_ia.html",
+        consulta=consulta,
+        resultado=resultado
+    )
 # =========================
 # CHAT PERSONA (MEMORIA VIVA)
 # =========================
