@@ -3,6 +3,6 @@ venv_ai/
 .venv/
 __pycache__/
 *.pyc
-*.pyo
 *.pyd
+*.dll
 .env
