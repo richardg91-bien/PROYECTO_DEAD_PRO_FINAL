@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ persona }}</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+<h1>{{ persona }}</h1>
+
+<h2>Todos los recuerdos</h2>
+
+{% for item in recuerdos %}
+
+<div class="card">
+
+    <img src="{{ url_for('static',
+    filename='uploads/' + item.image) }}"
+    width="250">
+
+    <h3>{{ item.title }}</h3>
+
+    <p>{{ item.description }}</p>
+
+    <a href="/experiencia/{{ item.id }}">
+        Ver experiencia
+    </a>
+    <a href="/chat_persona/{{ persona }}">
+    Hablar con {{ persona }}
+</a>
+<a href="/chat_persona/{{ persona }}">
+    🤖 Hablar con {{ persona }}
+</a>
+
+<br><br>
+
+</div>
+
+<hr>
+
+{% endfor %}
+
+<a href="/galeria">
+    Volver a la galería
+</a>
+
+</body>
+</html>

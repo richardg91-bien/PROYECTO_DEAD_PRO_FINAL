@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Subir recuerdo</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <h2>Subir recuerdo</h2>
+
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+
+        <input
+            type="text"
+            name="persona"
+            placeholder="Nombre de la persona"
+            required>
+
+        <br><br>
+
+        <input
+            type="text"
+            name="title"
+            placeholder="Título del recuerdo"
+            required>
+
+        <br><br>
+
+        <textarea
+            name="description"
+            placeholder="Descripción"
+            required></textarea>
+
+        <br><br>
+
+        <input
+            type="file"
+            name="image"
+            required>
+
+        <br><br>
+
+        <button type="submit">
+            Subir
+        </button>
+
+    </form>
+
+    <br>
+
+    <a href="/">Volver</a>
+
+</body>
+</html>
