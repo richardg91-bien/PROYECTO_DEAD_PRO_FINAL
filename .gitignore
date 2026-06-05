@@ -1,4 +1,8 @@
 venv/
+venv_ai/
+.venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .env
