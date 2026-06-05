@@ -1,5 +1,6 @@
-venv/
 venv_ai/
+venv_voice/
+venv/
 .venv/
 __pycache__/
 *.pyc
