@@ -3,8 +3,6 @@
 from flask import Blueprint, render_template, request, redirect, current_app, jsonify
 import uuid
 
-from app import get_db
-from app.exceptions import ValidationError, NotFoundError, IAServiceError, FileUploadError
 from app.services.emotion_service import detectar_emocion
 from app.services.memory_service import guardar_memoria, obtener_memorias_personaje
 from app.services.validation import (
@@ -18,11 +16,33 @@ main = Blueprint('main', __name__)
 
 
 # =========================
+# DEBUG
+# =========================
+@main.route("/debug")
+def debug():
+    return {
+        "supabase": hasattr(current_app, "supabase"),
+        "openai": hasattr(current_app, "openai_client")
+    }
+
+
+# =========================
 # HOME
 # =========================
 @main.route("/")
 def index():
     return render_template("index.html")
+
+
+# =========================
+# API TEST
+# =========================
+@main.route("/api/test")
+def api_test():
+    return jsonify({
+        "status": "ok",
+        "mensaje": "Proyecto Dead conectado correctamente"
+    })
 
 
 # =========================
@@ -33,13 +53,14 @@ def upload():
     if request.method == "GET":
         return render_template("upload.html")
 
-    # Validar archivo
+    if not hasattr(current_app, "supabase"):
+        return "Supabase no configurado", 500
+
     file = request.files.get("image")
     valido, error = validar_archivo_imagen(file)
     if not valido:
         return render_template("upload.html", error=error), 400
 
-    # Validar formulario
     persona = request.form.get("persona", "").strip()
     title = request.form.get("title", "").strip()
     description = request.form.get("description", "").strip()
@@ -51,23 +72,21 @@ def upload():
     try:
         uid = str(uuid.uuid4())
 
-        # Guardar imagen
         filename = guardar_imagen(file)
 
-        # Generar QR
         qr_url = f"{request.host_url.rstrip('/')}/experiencia/{uid}"
         qr_name = generar_qr(qr_url)
 
-        # Guardar en BD
-        db = get_db()
-        db.execute(
-            "INSERT INTO experiences VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)",
-            (uid, persona, title, description, filename, qr_name)
-        )
-        db.commit()
-        db.close()
+        current_app.supabase.table("experiences").insert({
+            "id": uid,
+            "persona": persona,
+            "title": title,
+            "description": description,
+            "image": filename,
+            "qr": qr_name
+        }).execute()
 
-        # Guardar embedding inicial
+        # embedding opcional
         try:
             texto = f"{persona} | {title} | {description}"
             emb = generar_embedding(texto)
@@ -75,40 +94,52 @@ def upload():
         except Exception as e:
             print(f"⚠️ Error embedding: {e}")
 
-        return redirect("/galeria")
+        return redirect("/")
 
     except Exception as e:
         print(f"❌ Error upload: {e}")
-        return render_template("upload.html", error="Error al procesar upload"), 500
+        return render_template("upload.html", error="Error al subir experiencia"), 500
 
 
 # =========================
-# GALERIA
+# API EXPERIENCIAS
 # =========================
-@main.route("/galeria")
-def galeria():
-    db = get_db()
-    data = db.execute("SELECT * FROM experiences ORDER BY created_at DESC").fetchall()
-    db.close()
-    return render_template("galeria.html", data=data)
+@main.route("/api/experiencias")
+def api_experiencias():
+    try:
+        res = current_app.supabase \
+            .table("experiences") \
+            .select("*") \
+            .order("created_at", desc=True) \
+            .execute()
+
+        return jsonify(res.data or [])
+
+    except Exception as e:
+        print(f"❌ Error supabase: {e}")
+        return jsonify({"error": "Error al obtener experiencias"}), 500
 
 
 # =========================
-# EXPERIENCIA
+# API EXPERIENCIA
 # =========================
-@main.route("/experiencia/<id>")
-def experiencia(id):
-    db = get_db()
-    item = db.execute(
-        "SELECT * FROM experiences WHERE id=?",
-        (id,)
-    ).fetchone()
-    db.close()
+@main.route("/api/experiencia/<id>")
+def api_experiencia(id):
+    try:
+        res = current_app.supabase \
+            .table("experiences") \
+            .select("*") \
+            .eq("id", id) \
+            .execute()
 
-    if not item:
-        return render_template("error.html", message="Experiencia no encontrada"), 404
+        if not res.data:
+            return jsonify({"error": "No encontrada"}), 404
 
-    return render_template("experiencia.html", item=item)
+        return jsonify(res.data[0])
+
+    except Exception as e:
+        print(f"❌ Error detalle: {e}")
+        return jsonify({"error": "Error interno"}), 500
 
 
 # =========================
@@ -119,8 +150,10 @@ def chat():
     if request.method == "GET":
         return render_template("chat.html")
 
+    if not current_app.openai_client:
+        return render_template("chat.html", error="IA no configurada"), 500
+
     mensaje = request.form.get("message", "").strip()
-    respuesta = ""
 
     valido, error = validar_mensaje_chat(mensaje)
     if not valido:
@@ -134,48 +167,22 @@ def chat():
         respuesta = r.choices[0].message.content
 
     except Exception as e:
-        print(f"❌ Error IA chat: {e}")
+        print(f"❌ Error IA: {e}")
         respuesta = "Error al consultar IA"
 
     return render_template("chat.html", mensaje=mensaje, respuesta=respuesta)
 
 
 # =========================
-# BUSCAR CON IA
-# =========================
-@main.route("/buscar_ia", methods=["GET", "POST"])
-def buscar_ia():
-    if request.method == "GET":
-        return render_template("buscar_ia.html")
-
-    consulta = request.form.get("consulta", "").strip()
-    resultado = ""
-
-    valido, error = validar_mensaje_chat(consulta)
-    if not valido:
-        return render_template("buscar_ia.html", error=error), 400
-
-    try:
-        r = current_app.openai_client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": consulta}]
-        )
-        resultado = r.choices[0].message.content
-
-    except Exception as e:
-        print(f"❌ Error IA buscar: {e}")
-        resultado = "Error al buscar"
-
-    return render_template("resultados_ia.html", consulta=consulta, resultado=resultado)
-
-
-# =========================
-# CHAT CON PERSONA (MEMORIA VIVA)
+# CHAT PERSONA
 # =========================
 @main.route("/chat_persona/<nombre>", methods=["GET", "POST"])
 def chat_persona(nombre):
     if request.method == "GET":
         return render_template("chat_persona.html", persona=nombre)
+
+    if not current_app.openai_client:
+        return render_template("chat_persona.html", persona=nombre, error="IA no disponible")
 
     msg = request.form.get("message", "").strip()
 
@@ -185,13 +192,11 @@ def chat_persona(nombre):
 
     emocion = detectar_emocion(msg)
 
-    # Generar embedding del mensaje
     try:
         emb = generar_embedding(msg)
         if hasattr(emb, "tolist"):
             emb = emb.tolist()
 
-        # Buscar memoria semántica
         resultados = obtener_memorias_personaje(nombre, emb)
         contexto = "\n".join([r.get("contenido", "") for r in resultados])[:2000]
 
@@ -199,7 +204,6 @@ def chat_persona(nombre):
         print(f"⚠️ Error embedding: {e}")
         contexto = ""
 
-    # Crear prompt con contexto
     prompt = f"""
 Sos {nombre}, una persona real.
 
@@ -215,7 +219,7 @@ Respondé de forma humana, emocional y natural.
 No digas que sos IA.
 """
 
-    respuesta = "No pude responder ahora."
+    respuesta = "No pude responder."
     audio_path = None
 
     try:
@@ -226,21 +230,19 @@ No digas que sos IA.
         respuesta = r.choices[0].message.content.strip()
 
     except Exception as e:
-        print(f"❌ ERROR IA: {e}")
+        print(f"❌ Error IA persona: {e}")
 
-    # Guardar memoria evolutiva
     try:
         memoria_texto = f"U:{msg} | R:{respuesta}"
         emb_respuesta = generar_embedding(memoria_texto)
         guardar_memoria(nombre, memoria_texto, emb_respuesta)
     except Exception as e:
-        print(f"⚠️ Error guardar memoria: {e}")
+        print(f"⚠️ Error memoria: {e}")
 
-    # Generar audio
     try:
         audio_path = generar_audio(respuesta)
     except Exception as e:
-        print(f"⚠️ Error generando audio: {e}")
+        print(f"⚠️ Error audio: {e}")
 
     return render_template(
         "chat_persona.html",
@@ -257,15 +259,21 @@ No digas que sos IA.
 @main.route("/admin")
 def admin():
     try:
-        res = current_app.supabase.table("aria_embeddings").select("*").limit(50).execute()
+        res = current_app.supabase \
+            .table("aria_embeddings") \
+            .select("*") \
+            .limit(50) \
+            .execute()
+
         return render_template("admin.html", data=res.data)
+
     except Exception as e:
         print(f"❌ Error admin: {e}")
         return render_template("admin.html", data=[])
 
 
 # =========================
-# ERROR HANDLERS
+# ERRORES
 # =========================
 @main.errorhandler(404)
 def not_found(error):
