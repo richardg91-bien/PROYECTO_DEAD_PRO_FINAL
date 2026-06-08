@@ -1,53 +1,20 @@
-from flask import Blueprint, render_template, request, redirect, current_app
-import os
+"""Rutas principales de la aplicación"""
+
+from flask import Blueprint, render_template, request, redirect, current_app, jsonify
 import uuid
-import sqlite3
-import qrcode
+
+from app import get_db
+from app.exceptions import ValidationError, NotFoundError, IAServiceError, FileUploadError
+from app.services.emotion_service import detectar_emocion
+from app.services.memory_service import guardar_memoria, obtener_memorias_personaje
+from app.services.validation import (
+    validar_archivo_imagen, validar_form_upload, validar_mensaje_chat
+)
+from app.services.upload_service import guardar_imagen, generar_qr
 from app.ia_service import generar_embedding
 from app.voz_service import generar_audio
 
 main = Blueprint('main', __name__)
-
-
-# =========================
-# BASE DE DATOS
-# =========================
-def get_db():
-    conn = sqlite3.connect("database.db")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-# =========================
-# UTILIDADES
-# =========================
-def detectar_emocion(texto):
-    """Detecta emoción basada en palabras clave"""
-    t = texto.lower()
-
-    if any(x in t for x in ["triste", "llorar", "extraño", "dolor"]):
-        return "triste"
-    if any(x in t for x in ["feliz", "alegre", "contento"]):
-        return "feliz"
-    if any(x in t for x in ["enojado", "bronca", "odio"]):
-        return "enojado"
-    return "neutral"
-
-
-def guardar_memoria(persona, contenido, embedding):
-    """Guarda memoria en Supabase"""
-    try:
-        if hasattr(embedding, "tolist"):
-            embedding = embedding.tolist()
-
-        current_app.supabase.table("aria_embeddings").insert({
-            "persona": persona,
-            "contenido": contenido,
-            "embedding": embedding
-        }).execute()
-
-    except Exception as e:
-        print("❌ ERROR memoria:", e)
 
 
 # =========================
@@ -63,54 +30,56 @@ def index():
 # =========================
 @main.route("/upload", methods=["GET", "POST"])
 def upload():
-
     if request.method == "GET":
         return render_template("upload.html")
 
+    # Validar archivo
     file = request.files.get("image")
-    persona = request.form.get("persona")
-    title = request.form.get("title")
-    desc = request.form.get("description")
+    valido, error = validar_archivo_imagen(file)
+    if not valido:
+        return render_template("upload.html", error=error), 400
 
-    if not file or not file.filename:
-        return "❌ No imagen"
+    # Validar formulario
+    persona = request.form.get("persona", "").strip()
+    title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
 
-    if not persona or not title or not desc:
-        return "❌ Faltan datos"
+    valido, error = validar_form_upload(persona, title, description)
+    if not valido:
+        return render_template("upload.html", error=error), 400
 
-    uid = str(uuid.uuid4())
-
-    filename = f"{uid}.jpg"
-    filepath = os.path.join("static/uploads", filename)
-
-    file.save(filepath)
-
-    # Generar QR
-    qr_url = f"{request.host_url.rstrip('/')}/experiencia/{uid}"
-
-    qr_name = f"{uid}.png"
-    qr_path = os.path.join("static/qr", qr_name)
-
-    qrcode.make(qr_url).save(qr_path)
-
-    # Guardar en DB
-    db = get_db()
-    db.execute(
-        "INSERT INTO experiences VALUES (?,?,?,?,?,?)",
-        (uid, persona, title, desc, filename, qr_name)
-    )
-    db.commit()
-    db.close()
-
-    # Guardar embedding inicial
     try:
-        texto = f"{persona} | {title} | {desc}"
-        emb = generar_embedding(texto)
-        guardar_memoria(persona, texto, emb)
-    except Exception as e:
-        print("❌ ERROR embedding:", e)
+        uid = str(uuid.uuid4())
 
-    return redirect("/galeria")
+        # Guardar imagen
+        filename = guardar_imagen(file)
+
+        # Generar QR
+        qr_url = f"{request.host_url.rstrip('/')}/experiencia/{uid}"
+        qr_name = generar_qr(qr_url)
+
+        # Guardar en BD
+        db = get_db()
+        db.execute(
+            "INSERT INTO experiences VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)",
+            (uid, persona, title, description, filename, qr_name)
+        )
+        db.commit()
+        db.close()
+
+        # Guardar embedding inicial
+        try:
+            texto = f"{persona} | {title} | {description}"
+            emb = generar_embedding(texto)
+            guardar_memoria(persona, texto, emb)
+        except Exception as e:
+            print(f"⚠️ Error embedding: {e}")
+
+        return redirect("/galeria")
+
+    except Exception as e:
+        print(f"❌ Error upload: {e}")
+        return render_template("upload.html", error="Error al procesar upload"), 500
 
 
 # =========================
@@ -119,7 +88,7 @@ def upload():
 @main.route("/galeria")
 def galeria():
     db = get_db()
-    data = db.execute("SELECT * FROM experiences").fetchall()
+    data = db.execute("SELECT * FROM experiences ORDER BY created_at DESC").fetchall()
     db.close()
     return render_template("galeria.html", data=data)
 
@@ -137,7 +106,7 @@ def experiencia(id):
     db.close()
 
     if not item:
-        return "❌ Experiencia no encontrada"
+        return render_template("error.html", message="Experiencia no encontrada"), 404
 
     return render_template("experiencia.html", item=item)
 
@@ -147,33 +116,28 @@ def experiencia(id):
 # =========================
 @main.route("/chat", methods=["GET", "POST"])
 def chat():
-
     if request.method == "GET":
         return render_template("chat.html")
 
-    mensaje = request.form.get("message", "")
+    mensaje = request.form.get("message", "").strip()
     respuesta = ""
 
-    if mensaje:
-        try:
-            r = current_app.openai_client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[
-                    {"role": "user", "content": mensaje}
-                ]
-            )
+    valido, error = validar_mensaje_chat(mensaje)
+    if not valido:
+        return render_template("chat.html", error=error), 400
 
-            respuesta = r.choices[0].message.content
+    try:
+        r = current_app.openai_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": mensaje}]
+        )
+        respuesta = r.choices[0].message.content
 
-        except Exception as e:
-            print(e)
-            respuesta = "Error al consultar IA"
+    except Exception as e:
+        print(f"❌ Error IA chat: {e}")
+        respuesta = "Error al consultar IA"
 
-    return render_template(
-        "chat.html",
-        mensaje=mensaje,
-        respuesta=respuesta
-    )
+    return render_template("chat.html", mensaje=mensaje, respuesta=respuesta)
 
 
 # =========================
@@ -181,36 +145,28 @@ def chat():
 # =========================
 @main.route("/buscar_ia", methods=["GET", "POST"])
 def buscar_ia():
-
     if request.method == "GET":
         return render_template("buscar_ia.html")
 
-    consulta = request.form.get("consulta", "")
+    consulta = request.form.get("consulta", "").strip()
     resultado = ""
 
-    if consulta:
-        try:
-            r = current_app.openai_client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": consulta
-                    }
-                ]
-            )
+    valido, error = validar_mensaje_chat(consulta)
+    if not valido:
+        return render_template("buscar_ia.html", error=error), 400
 
-            resultado = r.choices[0].message.content
+    try:
+        r = current_app.openai_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": consulta}]
+        )
+        resultado = r.choices[0].message.content
 
-        except Exception as e:
-            print(e)
-            resultado = "Error al buscar"
+    except Exception as e:
+        print(f"❌ Error IA buscar: {e}")
+        resultado = "Error al buscar"
 
-    return render_template(
-        "resultados_ia.html",
-        consulta=consulta,
-        resultado=resultado
-    )
+    return render_template("resultados_ia.html", consulta=consulta, resultado=resultado)
 
 
 # =========================
@@ -218,34 +174,30 @@ def buscar_ia():
 # =========================
 @main.route("/chat_persona/<nombre>", methods=["GET", "POST"])
 def chat_persona(nombre):
-
     if request.method == "GET":
         return render_template("chat_persona.html", persona=nombre)
 
     msg = request.form.get("message", "").strip()
 
-    if not msg:
-        return render_template("chat_persona.html", persona=nombre)
+    valido, error = validar_mensaje_chat(msg)
+    if not valido:
+        return render_template("chat_persona.html", persona=nombre, error=error), 400
 
     emocion = detectar_emocion(msg)
 
     # Generar embedding del mensaje
-    emb = generar_embedding(msg)
-    if hasattr(emb, "tolist"):
-        emb = emb.tolist()
+    try:
+        emb = generar_embedding(msg)
+        if hasattr(emb, "tolist"):
+            emb = emb.tolist()
 
-    # Buscar memoria semántica
-    response = current_app.supabase.rpc("match_documents", {
-        "query_embedding": emb,
-        "match_threshold": 0.3,
-        "match_count": 5
-    }).execute()
+        # Buscar memoria semántica
+        resultados = obtener_memorias_personaje(nombre, emb)
+        contexto = "\n".join([r.get("contenido", "") for r in resultados])[:2000]
 
-    resultados = response.data or []
-
-    contexto = "\n".join([
-        r.get("contenido", "") for r in resultados
-    ])[:2000]
+    except Exception as e:
+        print(f"⚠️ Error embedding: {e}")
+        contexto = ""
 
     # Crear prompt con contexto
     prompt = f"""
@@ -263,27 +215,32 @@ Respondé de forma humana, emocional y natural.
 No digas que sos IA.
 """
 
+    respuesta = "No pude responder ahora."
+    audio_path = None
+
     try:
         r = current_app.openai_client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": prompt}]
         )
-
         respuesta = r.choices[0].message.content.strip()
 
     except Exception as e:
-        print("❌ ERROR IA:", e)
-        respuesta = "No pude responder ahora."
+        print(f"❌ ERROR IA: {e}")
 
     # Guardar memoria evolutiva
     try:
         memoria_texto = f"U:{msg} | R:{respuesta}"
-        guardar_memoria(nombre, memoria_texto, generar_embedding(memoria_texto))
+        emb_respuesta = generar_embedding(memoria_texto)
+        guardar_memoria(nombre, memoria_texto, emb_respuesta)
     except Exception as e:
-        print("❌ ERROR memoria:", e)
+        print(f"⚠️ Error guardar memoria: {e}")
 
     # Generar audio
-    audio_path = generar_audio(respuesta)
+    try:
+        audio_path = generar_audio(respuesta)
+    except Exception as e:
+        print(f"⚠️ Error generando audio: {e}")
 
     return render_template(
         "chat_persona.html",
@@ -299,5 +256,22 @@ No digas que sos IA.
 # =========================
 @main.route("/admin")
 def admin():
-    res = current_app.supabase.table("aria_embeddings").select("*").limit(50).execute()
-    return render_template("admin.html", data=res.data)
+    try:
+        res = current_app.supabase.table("aria_embeddings").select("*").limit(50).execute()
+        return render_template("admin.html", data=res.data)
+    except Exception as e:
+        print(f"❌ Error admin: {e}")
+        return render_template("admin.html", data=[])
+
+
+# =========================
+# ERROR HANDLERS
+# =========================
+@main.errorhandler(404)
+def not_found(error):
+    return render_template("error.html", message="Página no encontrada"), 404
+
+
+@main.errorhandler(500)
+def internal_error(error):
+    return render_template("error.html", message="Error interno del servidor"), 500

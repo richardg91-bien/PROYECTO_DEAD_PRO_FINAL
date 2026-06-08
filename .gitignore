@@ -7,3 +7,11 @@ __pycache__/
 *.pyd
 *.dll
 .env
+database.db
+.pytest_cache/
+*.egg-info/
+.DS_Store
+*.log
+static/audio/*.mp3
+.idea/
+.vscode/
