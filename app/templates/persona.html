@@ -42,7 +42,15 @@
 </div>
 
 <hr>
+{% extends "base.html" %}
 
+{% block content %}
+<h2>{{ persona.nombre }}</h2>
+
+<img src="{{ persona.imagen }}" width="200">
+<img src="{{ persona.qr_url }}" width="200">
+
+{% endblock %}
 {% endfor %}
 
 <a href="/galeria">

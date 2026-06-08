@@ -30,7 +30,8 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # =========================
 # APP
 # =========================
-app = Flask(__name__, template_folder="app/templates")
+app = Flask(__name__, template_folder="app/templates", static_folder="static")
+
 
 # =========================
 # CARPETAS SEGURAS

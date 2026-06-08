@@ -1,14 +1,14 @@
 from flask import Flask
-from dotenv import load_dotenv
+import sqlite3
 import os
 
 def create_app():
-    load_dotenv()
+    app = Flask(__name__)
 
-    app = Flask(__name__, template_folder="templates") 
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+    app.config['SECRET_KEY'] = 'clave_secreta'
+    app.config['DATABASE'] = os.path.join('instance', 'database.db')
 
-    from app.routes import main
+    from .routes import main
     app.register_blueprint(main)
 
     return app
