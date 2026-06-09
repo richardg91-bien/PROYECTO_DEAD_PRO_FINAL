@@ -1,0 +1,8 @@
+certifi==2026.5.20
+charset-normalizer==3.4.7
+click==8.1.7
+colorama==0.4.6
+gTTS==2.5.4
+idna==3.18
+requests==2.34.2
+urllib3==2.7.0

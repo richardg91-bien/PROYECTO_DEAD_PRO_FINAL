@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Galería</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+<h1>Galería de Recuerdos</h1>
+
+<div class="galeria">
+
+{% for item in data %}
+
+<div class="card">
+
+    <img src="{{ url_for('static',
+    filename='uploads/' + item.image) }}">
+
+    <h3>{{ item.persona }}</h3>
+
+    <h4>{{ item.title }}</h4>
+
+    <p>{{ item.description }}</p>
+
+    <a href="/experiencia/{{ item.id }}">
+        Ver experiencia
+    </a>
+    <a href="/persona/{{ item.persona }}">
+    {{ item.persona }}
+</a>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</body>
+</html>
