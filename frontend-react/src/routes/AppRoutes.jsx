@@ -3,12 +3,14 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "../context/AuthContext";
 import PrivateRoute    from "./PrivateRoute";
 
-import Welcome   from "../pages/Welcome";
-import Home      from "../pages/Home";
-import Login     from "../pages/Login";
-import Register  from "../pages/Register";
-import Dashboard from "../pages/Dashboard";
-import Galeria   from "../pages/Galeria";
+import Welcome        from "../pages/Welcome";
+import Home           from "../pages/Home";
+import Login          from "../pages/Login";
+import Register       from "../pages/Register";
+import Dashboard      from "../pages/Dashboard";
+import Galeria        from "../pages/Galeria";
+import AdminLogin     from "../pages/AdminLogin";
+import AdminDashboard from "../pages/AdminDashboard";
 
 export default function AppRoutes() {
   return (
@@ -28,6 +30,10 @@ export default function AppRoutes() {
           <Route path="/galeria" element={
             <PrivateRoute><Galeria /></PrivateRoute>
           } />
+
+          {/* Admin */}
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
           {/* Cualquier ruta desconocida redirige a home */}
           <Route path="*" element={<Navigate to="/" replace />} />
