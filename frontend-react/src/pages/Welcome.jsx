@@ -5,7 +5,7 @@ export default function Welcome() {
     <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
       {/* Background image */}
       <div className="absolute inset-0 bg-[url('/welcome-bg.jpg')] bg-cover bg-center" />
-      <div className="absolute inset-0 bg-white/30" />
+      <div className="absolute inset-0 bg-white/70" />
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center px-6 w-full max-w-md animate-fade-in">
@@ -21,7 +21,7 @@ export default function Welcome() {
         <h1 className="text-3xl font-serif font-bold text-gray-800 text-center mb-1">
           Recordatorio
         </h1>
-        <p className="text-lg font-serif text-[#D4AF37] flex items-center gap-2 mb-4">
+        <p className="text-lg font-serif text-[#8A5A00] flex items-center gap-2 mb-4">
           <span>✦</span>
           con IA
           <span>✦</span>
@@ -45,7 +45,7 @@ export default function Welcome() {
         {/* Login Link */}
         <Link
           to="/login"
-          className="mt-4 text-[#D4AF37] font-medium hover:underline"
+          className="mt-4 text-[#8A5A00] font-semibold hover:underline"
         >
           Iniciar sesión
         </Link>

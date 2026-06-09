@@ -12,6 +12,14 @@ export default function AdminLogin() {
   // Admin emails — puedes agregar más
   const ADMIN_EMAILS = ["admin@recordatorio.com", "richardg91@gmail.com"];
 
+  function enterTestAdmin() {
+    const testUser = { id: "admin-test", email: "admin.prueba@local" };
+    localStorage.setItem("admin_token", "test-admin-token");
+    localStorage.setItem("admin_user", JSON.stringify(testUser));
+    api.defaults.headers.common["Authorization"] = "Bearer test-admin-token";
+    navigate("/admin/dashboard");
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
@@ -69,7 +77,7 @@ export default function AdminLogin() {
               onChange={e => setEmail(e.target.value)}
               placeholder="admin@email.com"
               required
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-sm text-white placeholder-gray-400 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all"
+              className="w-full px-4 py-3 bg-gray-950 border border-gray-600 rounded-xl text-sm text-white placeholder-gray-300 caret-[#D4AF37] focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all"
             />
           </div>
 
@@ -81,7 +89,7 @@ export default function AdminLogin() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-sm text-white placeholder-gray-400 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all"
+              className="w-full px-4 py-3 bg-gray-950 border border-gray-600 rounded-xl text-sm text-white placeholder-gray-300 caret-[#D4AF37] focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all"
             />
           </div>
 
@@ -93,7 +101,19 @@ export default function AdminLogin() {
           >
             {loading ? "Verificando..." : "Acceder"}
           </button>
+
+          <button
+            type="button"
+            onClick={enterTestAdmin}
+            className="w-full py-3 rounded-full border border-[#D4AF37]/60 text-[#F5D47B] font-semibold text-sm hover:bg-[#D4AF37]/10 transition-colors"
+          >
+            Entrar como admin de prueba
+          </button>
         </form>
+
+        <p className="mt-4 text-center text-xs text-gray-400">
+          Acceso de prueba: solo crea una sesión local para revisar el panel.
+        </p>
       </div>
     </div>
   );

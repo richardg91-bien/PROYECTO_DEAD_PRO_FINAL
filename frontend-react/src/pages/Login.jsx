@@ -30,10 +30,10 @@ export default function Login() {
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 bg-[url('/welcome-bg.jpg')] bg-cover bg-center" />
-      <div className="absolute inset-0 bg-white/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-white/75 backdrop-blur-sm" />
 
       {/* Card */}
-      <div className="relative z-10 w-full max-w-sm mx-4 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl p-8 animate-fade-in">
+      <div className="relative z-10 w-full max-w-sm mx-4 bg-white text-gray-900 rounded-2xl shadow-xl p-8 animate-fade-in">
         {/* Bell icon */}
         <div className="flex justify-center mb-4">
           <div className="w-12 h-12 rounded-xl border-2 border-[#D4AF37] flex items-center justify-center bg-white shadow">
@@ -54,7 +54,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+            <label className="block text-sm font-semibold text-gray-800 mb-1">Email</label>
             <input
               type="email"
               value={email}
@@ -62,12 +62,12 @@ export default function Login() {
               placeholder="vos@email.com"
               required
               autoComplete="email"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-sm text-gray-950 placeholder-gray-500 caret-[#8A5A00] focus:outline-none focus:border-[#8A5A00] focus:ring-2 focus:ring-[#D4AF37]/25 transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Contraseña</label>
+            <label className="block text-sm font-semibold text-gray-800 mb-1">Contraseña</label>
             <input
               type="password"
               value={password}
@@ -75,7 +75,7 @@ export default function Login() {
               placeholder="••••••••"
               required
               autoComplete="current-password"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-sm text-gray-950 placeholder-gray-500 caret-[#8A5A00] focus:outline-none focus:border-[#8A5A00] focus:ring-2 focus:ring-[#D4AF37]/25 transition-all"
             />
           </div>
 
@@ -91,7 +91,7 @@ export default function Login() {
 
         <p className="mt-5 text-sm text-gray-400 text-center">
           ¿No tenés cuenta?{" "}
-          <Link to="/registro" className="text-[#D4AF37] font-medium hover:underline">
+          <Link to="/registro" className="text-[#8A5A00] font-semibold hover:underline">
             Registrate
           </Link>
         </p>
