@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
-  const { register } = useAuth();
+  const { register, loginAsTestUser } = useAuth();
+  const navigate = useNavigate();
 
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
@@ -30,11 +31,17 @@ export default function Register() {
       await register(email, password);
       setSuccess(true);
     } catch (err) {
-      const msg = err?.response?.data?.error || "Error al registrarse";
+      const msg = err?.response?.data?.error
+        || (err?.request ? "No se pudo conectar con el backend. Iniciá Flask en http://127.0.0.1:5000 y probá otra vez." : "Error al registrarse");
       setError(msg);
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleTestUser() {
+    loginAsTestUser();
+    navigate("/dashboard");
   }
 
   if (success) {
@@ -133,6 +140,14 @@ export default function Register() {
             style={{ background: "linear-gradient(to right, #C4973B, #D4A853, #C4973B)" }}
           >
             {loading ? "Creando cuenta..." : "Registrarme"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleTestUser}
+            className="w-full py-3 rounded-full border border-[#8A5A00]/40 text-[#8A5A00] font-semibold text-sm hover:bg-[#8A5A00]/10 transition-colors"
+          >
+            Entrar como usuario de prueba
           </button>
         </form>
 

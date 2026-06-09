@@ -50,6 +50,13 @@ export default function Welcome() {
           Iniciar sesión
         </Link>
 
+        <Link
+          to="/admin"
+          className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-700 hover:text-[#8A5A00] hover:underline"
+        >
+          Acceso admin de prueba
+        </Link>
+
         {/* Features Footer */}
         <div className="mt-12 grid grid-cols-3 gap-4 w-full text-center">
           <div className="flex flex-col items-center gap-1">

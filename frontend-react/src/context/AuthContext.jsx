@@ -23,6 +23,12 @@ export function AuthProvider({ children }) {
   // Al montar, verificar si el token guardado sigue siendo válido
   useEffect(() => {
     if (token) {
+      if (token === "test-user-token") {
+        setUser({ id: "test-user", email: "usuario.prueba@local" });
+        setLoading(false);
+        return;
+      }
+
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       api.get("/api/auth/me")
         .then(res => setUser(res.data))
@@ -41,15 +47,29 @@ export function AuthProvider({ children }) {
   }
 
   async function login(email, password) {
-    const res = await api.post("/api/auth/login", { email, password });
+    const res = await api.post("/api/auth/login", {
+      email: email.trim().toLowerCase(),
+      password,
+    });
     saveSession(res.data.access_token, res.data.user);
     localStorage.setItem("refresh_token", res.data.refresh_token);
     return res.data;
   }
 
   async function register(email, password) {
-    const res = await api.post("/api/auth/register", { email, password });
+    const res = await api.post("/api/auth/register", {
+      email: email.trim().toLowerCase(),
+      password,
+    });
     return res.data;
+  }
+
+  function loginAsTestUser() {
+    const testUser = { id: "test-user", email: "usuario.prueba@local" };
+    localStorage.setItem("access_token", "test-user-token");
+    api.defaults.headers.common["Authorization"] = "Bearer test-user-token";
+    setToken("test-user-token");
+    setUser(testUser);
   }
 
   async function logout() {
@@ -63,7 +83,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, loginAsTestUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

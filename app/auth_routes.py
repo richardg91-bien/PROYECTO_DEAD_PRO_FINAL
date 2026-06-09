@@ -1,4 +1,4 @@
-"""Rutas de autenticación — registro, login, logout, perfil"""
+"""Rutas de autenticacion: registro, login, logout y perfil."""
 
 from flask import Blueprint, request, jsonify, current_app
 from app.auth import login_required
@@ -6,9 +6,28 @@ from app.auth import login_required
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 
-# ─────────────────────────────────────────
+def _auth_error_message(error):
+    """Traduce errores comunes de Supabase a mensajes utiles para la UI."""
+    msg = str(error)
+    lower = msg.lower()
+
+    if "already registered" in lower or "already been registered" in lower or "user already registered" in lower:
+        return "Este email ya está registrado", 409
+    if "signup" in lower and ("disabled" in lower or "not allowed" in lower):
+        return "El registro está deshabilitado en Supabase. Activa Email signups en Authentication.", 403
+    if "invalid email" in lower:
+        return "Email inválido", 400
+    if "password" in lower and ("weak" in lower or "short" in lower):
+        return "La contraseña es demasiado débil", 400
+    if "rate limit" in lower or "too many" in lower:
+        return "Demasiados intentos. Probá de nuevo en unos minutos.", 429
+    if "api key" in lower or "jwt" in lower:
+        return "La configuración de Supabase no es válida. Revisá SUPABASE_KEY.", 500
+
+    return "Error al registrar usuario", 500
+
+
 # REGISTRO
-# ─────────────────────────────────────────
 @auth_bp.route("/register", methods=["POST"])
 def register():
     """
@@ -16,7 +35,7 @@ def register():
     Crea el usuario en Supabase Auth.
     """
     data = request.get_json(silent=True) or {}
-    email    = (data.get("email") or "").strip()
+    email    = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
 
     # Validaciones básicas
@@ -45,12 +64,9 @@ def register():
         }), 201
 
     except Exception as e:
-        msg = str(e)
-        # Supabase devuelve mensajes en inglés — los traducimos
-        if "already registered" in msg.lower():
-            return jsonify({"error": "Este email ya está registrado"}), 409
-        print(f"❌ Error register: {e}")
-        return jsonify({"error": "Error al registrar usuario"}), 500
+        error, status = _auth_error_message(e)
+        print(f"Error register: {e}")
+        return jsonify({"error": error}), status
 
 
 # ─────────────────────────────────────────
