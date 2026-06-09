@@ -3,6 +3,7 @@
 from flask import Blueprint, render_template, request, redirect, current_app, jsonify
 import uuid
 
+from app.auth import login_required
 from app.services.emotion_service import detectar_emocion
 from app.services.memory_service import guardar_memoria, obtener_memorias_personaje
 from app.services.validation import (
@@ -49,7 +50,8 @@ def api_test():
 # UPLOAD
 # =========================
 @main.route("/upload", methods=["GET", "POST"])
-def upload():
+@login_required
+def upload(current_user=None):
     if request.method == "GET":
         return render_template("upload.html")
 
@@ -146,7 +148,8 @@ def api_experiencia(id):
 # CHAT SIMPLE
 # =========================
 @main.route("/chat", methods=["GET", "POST"])
-def chat():
+@login_required
+def chat(current_user=None):
     if request.method == "GET":
         return render_template("chat.html")
 
@@ -177,7 +180,8 @@ def chat():
 # CHAT PERSONA
 # =========================
 @main.route("/chat_persona/<nombre>", methods=["GET", "POST"])
-def chat_persona(nombre):
+@login_required
+def chat_persona(nombre, current_user=None):
     if request.method == "GET":
         return render_template("chat_persona.html", persona=nombre)
 
@@ -257,7 +261,8 @@ No digas que sos IA.
 # ADMIN
 # =========================
 @main.route("/admin")
-def admin():
+@login_required
+def admin(current_user=None):
     try:
         res = current_app.supabase \
             .table("aria_embeddings") \

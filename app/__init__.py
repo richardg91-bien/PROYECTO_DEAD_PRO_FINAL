@@ -20,7 +20,9 @@ def create_app():
         static_folder="../static"
     )
 
-    CORS(app)
+    # Permitir el header Authorization desde el frontend React
+    CORS(app, resources={r"/*": {"origins": "*"}},
+         allow_headers=["Content-Type", "Authorization"])
 
     # =========================
     # VARIABLES DE ENTORNO
@@ -66,5 +68,8 @@ def create_app():
     # =========================
     from app.routes import main
     app.register_blueprint(main)
+
+    from app.auth_routes import auth_bp
+    app.register_blueprint(auth_bp)
 
     return app

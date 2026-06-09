@@ -1,23 +1,36 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import Home from "../pages/Home";
-import Login from "../pages/Login";
-import Register from "../pages/Register";
+import { AuthProvider } from "../context/AuthContext";
+import PrivateRoute    from "./PrivateRoute";
+
+import Home      from "../pages/Home";
+import Login     from "../pages/Login";
+import Register  from "../pages/Register";
 import Dashboard from "../pages/Dashboard";
-import Galeria from "../pages/Galeria";
+import Galeria   from "../pages/Galeria";
 
-function AppRoutes() {
+export default function AppRoutes() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/registro" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/galeria" element={<Galeria />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Rutas públicas */}
+          <Route path="/"         element={<Home />} />
+          <Route path="/login"    element={<Login />} />
+          <Route path="/registro" element={<Register />} />
+
+          {/* Rutas protegidas — redirigen a /login si no hay sesión */}
+          <Route path="/dashboard" element={
+            <PrivateRoute><Dashboard /></PrivateRoute>
+          } />
+          <Route path="/galeria" element={
+            <PrivateRoute><Galeria /></PrivateRoute>
+          } />
+
+          {/* Cualquier ruta desconocida redirige a home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
-
-export default AppRoutes;
