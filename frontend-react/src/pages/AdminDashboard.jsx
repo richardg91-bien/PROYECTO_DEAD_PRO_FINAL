@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
@@ -7,21 +7,12 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ experiences: 0, embeddings: 0 });
   const [experiences, setExperiences] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [adminUser, setAdminUser] = useState(null);
-
-  useEffect(() => {
-    const token = localStorage.getItem("admin_token");
+  const [adminUser] = useState(() => {
     const user = localStorage.getItem("admin_user");
-    if (!token) {
-      navigate("/admin");
-      return;
-    }
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    setAdminUser(user ? JSON.parse(user) : null);
-    loadData();
-  }, []);
+    return user ? JSON.parse(user) : null;
+  });
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const res = await api.get("/api/experiencias");
       setExperiences(res.data || []);
@@ -31,7 +22,17 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("admin_token");
+    if (!token) {
+      navigate("/admin");
+      return;
+    }
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    loadData();
+  }, [loadData, navigate]);
 
   function handleLogout() {
     localStorage.removeItem("admin_token");

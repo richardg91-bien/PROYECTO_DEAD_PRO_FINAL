@@ -19,8 +19,10 @@ def guardar_imagen(file, upload_folder="static/uploads"):
     """
     os.makedirs(upload_folder, exist_ok=True)
     
+    original_name = secure_filename(file.filename or "")
+    ext = original_name.rsplit(".", 1)[1].lower() if "." in original_name else "jpg"
     uid = str(uuid.uuid4())
-    filename = f"{uid}.jpg"
+    filename = f"{uid}.{ext}"
     filepath = os.path.join(upload_folder, filename)
     
     file.save(filepath)

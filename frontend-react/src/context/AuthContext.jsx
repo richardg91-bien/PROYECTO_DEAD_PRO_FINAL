@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import api from "../services/api";
 
 const AuthContext = createContext(null);
@@ -12,6 +12,14 @@ export function AuthProvider({ children }) {
   const [token, setToken]     = useState(() => localStorage.getItem("access_token"));
   const [loading, setLoading] = useState(true);
 
+  const clearSession = useCallback(() => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    delete api.defaults.headers.common["Authorization"];
+    setToken(null);
+    setUser(null);
+  }, []);
+
   // Al montar, verificar si el token guardado sigue siendo válido
   useEffect(() => {
     if (token) {
@@ -23,21 +31,13 @@ export function AuthProvider({ children }) {
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [clearSession, token]);
 
   function saveSession(accessToken, userData) {
     localStorage.setItem("access_token", accessToken);
     api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
     setToken(accessToken);
     setUser(userData);
-  }
-
-  function clearSession() {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    delete api.defaults.headers.common["Authorization"];
-    setToken(null);
-    setUser(null);
   }
 
   async function login(email, password) {

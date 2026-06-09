@@ -1,65 +1,62 @@
-📦 PROYECTO_DEAD_PRO_FINAL
+# PROYECTO_DEAD_PRO_FINAL
 
-Sistema web desarrollado con Flask que integra funcionalidades de procesamiento, automatización y visualización de datos, orientado a experiencias interactivas y módulos de IA.
+Aplicacion web con backend Flask y frontend React para guardar experiencias, imagenes, codigos QR y conversaciones asistidas por IA.
 
-🚀 Características
-Aplicación web con Flask
-Renderizado de templates HTML
-Manejo de archivos estáticos (CSS / JS / imágenes)
-Integración con módulos de procesamiento (IA / automatización)
-Estructura escalable para futuras funciones
-🧠 Tecnologías utilizadas
-Python 3
-Flask
-HTML5
-CSS3
-JavaScript
-(Opcional según tu proyecto) PyTorch / IA modules
-📁 Estructura del proyecto
-PROYECTO_DEAD_PRO_FINAL/
-│
-├── app.py
-├── requirements.txt
-├── .gitignore
-│
-├── templates/
-│   ├── index.html
-│   └── (otras vistas)
-│
-├── static/
-│   ├── css/
-│   ├── js/
-│   └── img/
-│
-└── README.md
-⚙️ Instalación
-1. Clonar el repositorio
-git clone https://github.com/richardg91-bien/PROYECTO_DEAD_PRO_FINAL.git
-cd PROYECTO_DEAD_PRO_FINAL
-2. Crear entorno virtual
-python -m venv venv
+## Estructura principal
 
-Activar:
+- `app/`: backend Flask.
+- `frontend-react/`: frontend React/Vite.
+- `static/`: archivos generados por el backend en ejecucion local.
+- `tests/`: pruebas automatizadas del backend.
 
-Windows:
+La carpeta React valida es `frontend-react/`. Si aparecen copias internas como `frontend-react/frontend-react/`, no deben usarse como proyecto principal.
 
+## Configuracion
+
+1. Copia `.env.example` a `.env`.
+2. Completa `SUPABASE_URL`, `SUPABASE_KEY`, `SECRET_KEY` y opcionalmente `DEEPSEEK_API_KEY`.
+3. Para produccion, define `FLASK_DEBUG=0` y limita `CORS_ORIGINS` al dominio real del frontend.
+
+## Ejecutar backend
+
+```powershell
 venv\Scripts\activate
-3. Instalar dependencias
+python run.py
+```
+
+Backend local: `http://127.0.0.1:5000`
+
+## Ejecutar frontend
+
+```powershell
+cd frontend-react
+npm install
+npm run dev
+```
+
+Frontend local: `http://127.0.0.1:5173`
+
+Para apuntar el frontend a otro backend, crea `frontend-react/.env` con:
+
+```text
+VITE_API_URL=http://127.0.0.1:5000
+```
+
+## Pruebas
+
+```powershell
+pytest -q
+```
+
+Si el entorno virtual esta roto, recrealo:
+
+```powershell
+rmdir /s /q venv
+python -m venv venv
+venv\Scripts\activate
 pip install -r requirements.txt
-4. Ejecutar el proyecto
-python app.py
+```
 
-Luego abrir:
+## Git
 
-http://127.0.0.1:5000
-📌 Notas importantes
-El entorno virtual (venv) no se sube al repositorio.
-Las dependencias deben estar en requirements.txt.
-El proyecto está preparado para escalar a producción (Render / Railway / etc).
-🧾 Autor
-
-Desarrollado por Richard Garcia
-
-📄 Licencia
-
-Este proyecto es de uso educativo y personal.
+No se deben versionar bases de datos locales, imagenes subidas, QR generados, `node_modules`, `venv` ni copias duplicadas del proyecto.

@@ -1,7 +1,17 @@
+"""Servicio de embeddings."""
+
 from sentence_transformers import SentenceTransformer
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+_model = None
+
+
+def get_embedding_model():
+    global _model
+    if _model is None:
+        _model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _model
+
 
 def generar_embedding(texto):
-    embedding = model.encode(texto)
+    embedding = get_embedding_model().encode(texto)
     return embedding.tolist()

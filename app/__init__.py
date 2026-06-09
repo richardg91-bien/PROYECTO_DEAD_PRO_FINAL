@@ -1,4 +1,4 @@
-"""Factory de aplicación Flask y configuración global"""
+"""Factory de aplicacion Flask y configuracion global."""
 
 import os
 from flask import Flask
@@ -9,9 +9,8 @@ from openai import OpenAI
 
 
 def create_app():
-    """Factory para crear la aplicación Flask"""
+    """Factory para crear la aplicacion Flask."""
 
-    # 🔥 cargar variables de entorno
     load_dotenv()
 
     app = Flask(
@@ -20,9 +19,13 @@ def create_app():
         static_folder="../static"
     )
 
-    # Permitir el header Authorization desde el frontend React
-    CORS(app, resources={r"/*": {"origins": "*"}},
-         allow_headers=["Content-Type", "Authorization"])
+    cors_origins = os.getenv("CORS_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")
+    allowed_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+    CORS(
+        app,
+        resources={r"/*": {"origins": allowed_origins or ["http://127.0.0.1:5173"]}},
+        allow_headers=["Content-Type", "Authorization"]
+    )
 
     # =========================
     # VARIABLES DE ENTORNO
@@ -31,21 +34,18 @@ def create_app():
     SUPABASE_KEY = os.getenv("SUPABASE_KEY")
     DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
-    # 🔥 VALIDACIÓN
     if not SUPABASE_URL or not SUPABASE_KEY:
-        raise ValueError("❌ Faltan SUPABASE_URL o SUPABASE_KEY en .env")
+        raise ValueError("Faltan SUPABASE_URL o SUPABASE_KEY en .env")
 
     if not DEEPSEEK_API_KEY:
-        print("⚠️ Warning: falta DEEPSEEK_API_KEY")
+        print("Warning: falta DEEPSEEK_API_KEY")
 
     # =========================
     # CLIENTES EXTERNOS
     # =========================
 
-    # Supabase
     app.supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-    # OpenAI / DeepSeek
     if DEEPSEEK_API_KEY:
         app.openai_client = OpenAI(
             api_key=DEEPSEEK_API_KEY,
@@ -58,6 +58,8 @@ def create_app():
     # CONFIGURACIÓN APP
     # =========================
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev_secret")
+    if app.config["SECRET_KEY"] == "dev_secret":
+        print("Warning: usando SECRET_KEY de desarrollo. Define SECRET_KEY en produccion.")
 
     # Crear carpetas necesarias
     for folder in ["static/uploads", "static/qr", "static/audio"]:

@@ -51,8 +51,9 @@ def obtener_memorias_personaje(persona, embedding, threshold=0.3, limit=5):
             "match_threshold": threshold,
             "match_count": limit
         }).execute()
-        
-        return response.data or []
+
+        data = response.data or []
+        return [item for item in data if item.get("persona") in (None, persona)]
     
     except Exception as e:
         print(f"❌ ERROR obtener_memorias: {e}")
