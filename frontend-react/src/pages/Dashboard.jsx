@@ -11,7 +11,6 @@ export default function Dashboard() {
   const [showNueva, setShowNueva] = useState(false);
   const [nombreNuevo, setNombreNuevo] = useState("");
 
-  // Cargar personas únicas desde las experiencias guardadas
   useEffect(() => {
     api.get("/api/experiencias")
       .then(res => {
@@ -72,6 +71,7 @@ export default function Dashboard() {
 
         {/* Acciones rápidas */}
         <div className="grid grid-cols-2 gap-3 mb-8">
+
           <button
             onClick={() => setShowNueva(true)}
             className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#D4AF37]/30 transition-all group"
@@ -97,6 +97,33 @@ export default function Dashboard() {
               <p className="text-xs text-gray-400">Ver experiencias</p>
             </div>
           </Link>
+
+          <Link
+            to="/upload"
+            className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#D4AF37]/30 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+              <span className="text-xl">📸</span>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-gray-800 text-sm">Subir recuerdo</p>
+              <p className="text-xs text-gray-400">Imagen + descripción</p>
+            </div>
+          </Link>
+
+          <Link
+            to="/chat/asistente"
+            className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#D4AF37]/30 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+              <span className="text-xl">🧠</span>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-gray-800 text-sm">Chat IA</p>
+              <p className="text-xs text-gray-400">Hablar con el asistente</p>
+            </div>
+          </Link>
+
         </div>
 
         {/* Lista de personas */}
