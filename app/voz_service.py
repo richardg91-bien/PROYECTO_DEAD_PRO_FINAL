@@ -1,32 +1,23 @@
-import subprocess
-import sys
 import os
+import uuid
+from gtts import gTTS
+
+AUDIO_FOLDER = "static/audio"
+
 
 def generar_audio(texto):
-    """Genera audio usando gTTS a través de voz.py"""
+    """Genera audio usando gTTS y lo guarda en static/audio/."""
     try:
-        # Usar el Python del venv actual
-        python_exe = sys.executable
-        voz_script = os.path.join(os.path.dirname(__file__), "..", "voz.py")
+        os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-        result = subprocess.run(
-            [
-                python_exe,
-                voz_script,
-                texto
-            ],
-            capture_output=True,
-            text=True
-        )
+        nombre = f"{uuid.uuid4()}.mp3"
+        ruta = os.path.join(AUDIO_FOLDER, nombre)
 
-        if result.returncode != 0:
-            print("❌ ERROR VOZ:", result.stderr)
-            return None
+        tts = gTTS(text=texto, lang="es")
+        tts.save(ruta)
 
-        # Devuelve la ruta del audio generada por voz.py
-        ruta_audio = result.stdout.strip()
-        return ruta_audio
+        return nombre
 
     except Exception as e:
-        print("❌ ERROR VOZ:", e)
+        print(f"❌ ERROR VOZ: {e}")
         return None

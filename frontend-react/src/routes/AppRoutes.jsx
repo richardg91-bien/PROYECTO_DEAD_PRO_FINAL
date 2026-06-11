@@ -33,7 +33,9 @@ export default function AppRoutes() {
 
           {/* Admin */}
           <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/dashboard" element={
+            <PrivateRoute><AdminDashboard /></PrivateRoute>
+          } />
 
           {/* Cualquier ruta desconocida redirige a home */}
           <Route path="*" element={<Navigate to="/" replace />} />
