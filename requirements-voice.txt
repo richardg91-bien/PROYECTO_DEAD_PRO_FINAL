@@ -1,0 +1,6 @@
+# Dependencias para síntesis de voz con gTTS.
+# Ya incluidas en requirements.txt — este archivo queda como referencia explícita.
+#
+#   pip install -r requirements.txt -r requirements-voice.txt
+
+gTTS==2.5.4

@@ -1,22 +1,22 @@
 {
   "name": "proyecto_dead_pro_final",
   "version": "1.0.0",
-  "description": "PROYECTO_DEAD_PRO_FINAL",
-  "directories": {
-    "test": "tests"
-  },
+  "description": "Aplicacion web Flask + React para guardar experiencias, imagenes, QR y conversaciones con IA",
   "scripts": {
-    "frontend:dev": "npm --prefix frontend-react run dev",
-    "frontend:build": "npm --prefix frontend-react run build",
+    "frontend:dev":     "npm --prefix frontend-react run dev",
+    "frontend:build":   "npm --prefix frontend-react run build",
     "frontend:preview": "npm --prefix frontend-react run preview",
-    "frontend:lint": "npm --prefix frontend-react run lint",
-    "test": "pytest -q"
+    "frontend:lint":    "npm --prefix frontend-react run lint",
+    "frontend:install": "npm --prefix frontend-react install",
+    "test":             "pytest -q",
+    "test:verbose":     "pytest -v",
+    "start":            "concurrently \"venv/Scripts/activate && python run.py\" \"npm run frontend:dev\""
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/richardg91-bien/PROYECTO_DEAD_PRO_FINAL.git"
   },
-  "keywords": [],
+  "keywords": ["flask", "react", "vite", "supabase", "ai", "qr"],
   "author": "",
   "license": "ISC",
   "bugs": {

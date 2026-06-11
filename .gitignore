@@ -1,33 +1,64 @@
-venv_ai/
-venv_voice/
+# ── Python ──────────────────────────────────────────────
 venv/
 .venv/
+venv_ai/
+venv_voice/
 __pycache__/
 **/__pycache__/
-*.pyc
+*.py[cod]
 *.pyd
 *.dll
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Entorno ──────────────────────────────────────────────
 .env
+*.env.local
+
+# ── Base de datos local ──────────────────────────────────
 *.db
 database.db
+
+# ── Tests / CI ───────────────────────────────────────────
 .pytest_cache/
-*.egg-info/
-.DS_Store
-*.log
+htmlcov/
+.coverage
+coverage.xml
+
+# ── Archivos generados en runtime ───────────────────────
 static/audio/
 static/qr/
 static/uploads/
+
+# ── Node / Frontend ──────────────────────────────────────
+node_modules/
+frontend-react/node_modules/
+frontend-react/dist/
+frontend-react/.env
+frontend-react/.env.local
+
+# Copias duplicadas del proyecto dentro de frontend-react
+frontend-react/frontend-react/
 frontend-react/static/
 frontend-react/app/
 frontend-react/tests/
-frontend-react/frontend-react/
 frontend-react/database.db
 frontend-react/run.py
 frontend-react/voz.py
 frontend-react/requirements*.txt
-frontend-react/node_modules/
-frontend-react/dist/
-node_modules/
-dist/
-.idea/
+
+# ── Editores ─────────────────────────────────────────────
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Sistema operativo ────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+logs/
