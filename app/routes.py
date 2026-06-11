@@ -288,3 +288,91 @@ def not_found(error):
 @main.errorhandler(500)
 def internal_error(error):
     return render_template("error.html", message="Error interno del servidor"), 500
+
+# =========================
+# API CHAT PERSONA (JSON)
+# =========================
+@main.route("/api/chat/<nombre>", methods=["POST"])
+@login_required
+def api_chat_persona(nombre, current_user=None):
+    """
+    Endpoint JSON para el chat con persona desde el frontend React.
+    Body: { "message": "texto", "historial": [...] }
+    Devuelve: { "respuesta": "...", "emocion": "...", "audio": "ruta_o_null" }
+    """
+    if not current_app.openai_client:
+        return jsonify({"error": "IA no configurada en el servidor"}), 503
+
+    data = request.get_json(silent=True) or {}
+    msg = (data.get("message") or "").strip()
+    historial = data.get("historial") or []
+
+    valido, error = validar_mensaje_chat(msg)
+    if not valido:
+        return jsonify({"error": error}), 400
+
+    # Detectar emoción
+    emocion = detectar_emocion(msg)
+
+    # Recuperar memorias semánticas
+    contexto = ""
+    try:
+        emb = generar_embedding(msg)
+        resultados = obtener_memorias_personaje(nombre, emb)
+        contexto = "\n".join([r.get("contenido", "") for r in resultados])[:2000]
+    except Exception as e:
+        print(f"⚠️ Error embedding: {e}")
+
+    # Construir mensajes para la IA incluyendo historial de la conversación
+    system_prompt = f"""Sos {nombre}, una persona real que el usuario conoció y extraña.
+Estado emocional del usuario ahora: {emocion}.
+Recuerdos y memorias tuyas:
+{contexto if contexto else "(sin recuerdos previos aún)"}
+
+Respondé de forma humana, emocional y natural. Máximo 3 oraciones.
+No digas que sos IA. No rompas el personaje."""
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    # Agregar historial de la conversación actual
+    for turno in historial[-10:]:  # últimos 10 turnos
+        if turno.get("rol") == "usuario":
+            messages.append({"role": "user", "content": turno["texto"]})
+        elif turno.get("rol") == "ia":
+            messages.append({"role": "assistant", "content": turno["texto"]})
+
+    messages.append({"role": "user", "content": msg})
+
+    # Generar respuesta
+    respuesta = "No pude responder en este momento."
+    try:
+        r = current_app.openai_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=messages,
+            max_tokens=300
+        )
+        respuesta = r.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"❌ Error IA: {e}")
+        return jsonify({"error": f"Error al consultar la IA: {str(e)}"}), 500
+
+    # Guardar memoria para retroalimentación futura
+    try:
+        memoria_texto = f"U: {msg} | R: {respuesta}"
+        emb_nuevo = generar_embedding(memoria_texto)
+        guardar_memoria(nombre, memoria_texto, emb_nuevo)
+    except Exception as e:
+        print(f"⚠️ Error guardando memoria: {e}")
+
+    # Generar audio
+    audio_nombre = None
+    try:
+        audio_nombre = generar_audio(respuesta)
+    except Exception as e:
+        print(f"⚠️ Error audio: {e}")
+
+    return jsonify({
+        "respuesta": respuesta,
+        "emocion": emocion,
+        "audio": f"/static/audio/{audio_nombre}" if audio_nombre else None
+    })

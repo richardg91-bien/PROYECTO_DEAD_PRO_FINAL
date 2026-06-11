@@ -11,6 +11,7 @@ import Dashboard      from "../pages/Dashboard";
 import Galeria        from "../pages/Galeria";
 import AdminLogin     from "../pages/AdminLogin";
 import AdminDashboard from "../pages/AdminDashboard";
+import ChatPersona    from "../pages/ChatPersona";
 
 export default function AppRoutes() {
   return (
@@ -29,6 +30,9 @@ export default function AppRoutes() {
           } />
           <Route path="/galeria" element={
             <PrivateRoute><Galeria /></PrivateRoute>
+          } />
+          <Route path="/chat/:nombre" element={
+            <PrivateRoute><ChatPersona /></PrivateRoute>
           } />
 
           {/* Admin */}

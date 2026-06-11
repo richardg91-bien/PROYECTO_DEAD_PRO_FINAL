@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
-  const { register, loginAsTestUser } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   const [email,    setEmail]    = useState("");
@@ -37,11 +37,6 @@ export default function Register() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleTestUser() {
-    loginAsTestUser();
-    navigate("/dashboard");
   }
 
   if (success) {
@@ -142,13 +137,6 @@ export default function Register() {
             {loading ? "Creando cuenta..." : "Registrarme"}
           </button>
 
-          <button
-            type="button"
-            onClick={handleTestUser}
-            className="w-full py-3 rounded-full border border-[#8A5A00]/40 text-[#8A5A00] font-semibold text-sm hover:bg-[#8A5A00]/10 transition-colors"
-          >
-            Entrar como usuario de prueba
-          </button>
         </form>
 
         <p className="mt-5 text-sm text-gray-400 text-center">
