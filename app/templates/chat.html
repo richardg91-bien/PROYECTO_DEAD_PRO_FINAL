@@ -13,6 +13,7 @@
 </form>
 
 <hr>
+{% if error %}<p style="color:red">{{ error }}</p>{% endif %}
 
 {% if user_message %}
 <p><b>Tú:</b> {{ user_message }}</p>
