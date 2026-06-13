@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "../context/AuthContext";
 import PrivateRoute    from "./PrivateRoute";
-
+import Upload from "../pages/Upload";
 import Welcome        from "../pages/Welcome";
 import Home           from "../pages/Home";
 import Login          from "../pages/Login";
@@ -31,6 +31,9 @@ export default function AppRoutes() {
           <Route path="/galeria" element={
             <PrivateRoute><Galeria /></PrivateRoute>
           } />
+          <Route path="/upload" element={
+            <PrivateRoute><Upload /></PrivateRoute>
+} />
           <Route path="/chat/:nombre" element={
             <PrivateRoute><ChatPersona /></PrivateRoute>
           } />

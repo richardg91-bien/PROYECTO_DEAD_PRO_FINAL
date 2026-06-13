@@ -24,7 +24,8 @@ def create_app():
     CORS(
         app,
         resources={r"/*": {"origins": allowed_origins or ["http://127.0.0.1:5173"]}},
-        allow_headers=["Content-Type", "Authorization"]
+        allow_headers=["Content-Type", "Authorization"],
+        supports_credentials=True
     )
 
     # =========================
@@ -32,13 +33,13 @@ def create_app():
     # =========================
     SUPABASE_URL = os.getenv("SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+    DEEPSEEK_API_KEY = os.getenv("GROQ_API_KEY")
 
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise ValueError("Faltan SUPABASE_URL o SUPABASE_KEY en .env")
 
     if not DEEPSEEK_API_KEY:
-        print("Warning: falta DEEPSEEK_API_KEY")
+        print("Warning: falta GROQ_API_KEY")
 
     # =========================
     # CLIENTES EXTERNOS
@@ -49,7 +50,7 @@ def create_app():
     if DEEPSEEK_API_KEY:
         app.openai_client = OpenAI(
             api_key=DEEPSEEK_API_KEY,
-            base_url="https://api.deepseek.com"
+            base_url="https://api.groq.com/openai/v1"
         )
     else:
         app.openai_client = None

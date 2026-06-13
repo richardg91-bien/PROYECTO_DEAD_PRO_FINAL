@@ -164,7 +164,7 @@ def chat(current_user=None):
 
     try:
         r = current_app.openai_client.chat.completions.create(
-            model="deepseek-chat",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": mensaje}]
         )
         respuesta = r.choices[0].message.content
@@ -228,7 +228,7 @@ No digas que sos IA.
 
     try:
         r = current_app.openai_client.chat.completions.create(
-            model="deepseek-chat",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}]
         )
         respuesta = r.choices[0].message.content.strip()
@@ -347,7 +347,7 @@ No digas que sos IA. No rompas el personaje."""
     respuesta = "No pude responder en este momento."
     try:
         r = current_app.openai_client.chat.completions.create(
-            model="deepseek-chat",
+            model="llama-3.1-8b-instant",
             messages=messages,
             max_tokens=300
         )
