@@ -12,9 +12,17 @@ from app.services.validation import (
 from app.services.upload_service import guardar_imagen, generar_qr
 from app.ia_service import generar_embedding
 from app.voz_service import generar_audio
+from app.services.memory_service import guardar_memoria, obtener_memorias_personaje
+from flask import jsonify, request, current_app
+from app.services.memory_service import guardar_memoria, obtener_memorias_personaje
+from app.services.emotion_service import detectar_emocion
+from app.services.validation import validar_mensaje_chat
+from app.ia_service import generar_embedding
+from app.voz_service import generar_audio
+from app.auth import login_required
+
 
 main = Blueprint('main', __name__)
-
 
 # =========================
 # DEBUG
@@ -26,14 +34,12 @@ def debug():
         "openai": hasattr(current_app, "openai_client")
     }
 
-
 # =========================
 # HOME
 # =========================
 @main.route("/")
 def index():
     return render_template("index.html")
-
 
 # =========================
 # API TEST
@@ -44,7 +50,6 @@ def api_test():
         "status": "ok",
         "mensaje": "Proyecto Dead conectado correctamente"
     })
-
 
 # =========================
 # UPLOAD
@@ -88,11 +93,11 @@ def upload(current_user=None):
             "qr": qr_name
         }).execute()
 
-        # embedding opcional
+        # embedding opcional para experiencia (tipo 'experiencia')
         try:
             texto = f"{persona} | {title} | {description}"
             emb = generar_embedding(texto)
-            guardar_memoria(persona, texto, emb)
+            guardar_memoria(persona, texto, emb, tipo='experiencia')
         except Exception as e:
             print(f"⚠️ Error embedding: {e}")
 
@@ -101,7 +106,6 @@ def upload(current_user=None):
     except Exception as e:
         print(f"❌ Error upload: {e}")
         return render_template("upload.html", error="Error al subir experiencia"), 500
-
 
 # =========================
 # API EXPERIENCIAS
@@ -120,7 +124,6 @@ def api_experiencias():
     except Exception as e:
         print(f"❌ Error supabase: {e}")
         return jsonify({"error": "Error al obtener experiencias"}), 500
-
 
 # =========================
 # API EXPERIENCIA
@@ -142,7 +145,6 @@ def api_experiencia(id):
     except Exception as e:
         print(f"❌ Error detalle: {e}")
         return jsonify({"error": "Error interno"}), 500
-
 
 # =========================
 # CHAT SIMPLE
@@ -174,7 +176,6 @@ def chat(current_user=None):
         respuesta = "Error al consultar IA"
 
     return render_template("chat.html", mensaje=mensaje, respuesta=respuesta)
-
 
 # =========================
 # CHAT PERSONA
@@ -239,7 +240,7 @@ No digas que sos IA.
     try:
         memoria_texto = f"U:{msg} | R:{respuesta}"
         emb_respuesta = generar_embedding(memoria_texto)
-        guardar_memoria(nombre, memoria_texto, emb_respuesta)
+        guardar_memoria(nombre, memoria_texto, emb_respuesta, tipo='conversacion')
     except Exception as e:
         print(f"⚠️ Error memoria: {e}")
 
@@ -255,7 +256,6 @@ No digas que sos IA.
         audio=audio_path,
         message=msg
     )
-
 
 # =========================
 # ADMIN
@@ -275,7 +275,6 @@ def admin(current_user=None):
     except Exception as e:
         print(f"❌ Error admin: {e}")
         return render_template("admin.html", data=[])
-
 
 # =========================
 # ERRORES
@@ -360,7 +359,7 @@ No digas que sos IA. No rompas el personaje."""
     try:
         memoria_texto = f"U: {msg} | R: {respuesta}"
         emb_nuevo = generar_embedding(memoria_texto)
-        guardar_memoria(nombre, memoria_texto, emb_nuevo)
+        guardar_memoria(nombre, memoria_texto, emb_nuevo, tipo='conversacion')
     except Exception as e:
         print(f"⚠️ Error guardando memoria: {e}")
 

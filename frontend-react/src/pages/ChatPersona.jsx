@@ -17,12 +17,18 @@ export default function ChatPersona() {
   const [cargando, setCargando]   = useState(false);
   const [emocion, setEmocion]     = useState("neutral");
   const [error, setError]         = useState("");
+  const [ultimoMensajeFallido, setUltimoMensajeFallido] = useState(null);
   const audioRef  = useRef(null);
   const bottomRef = useRef(null);
   const baseUrl   = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const contenedor = bottomRef.current?.parentElement;
+    if (!contenedor) return;
+    const distanciaAlFinal = contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight;
+    if (distanciaAlFinal < 100) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [historial, cargando]);
 
   async function enviar(e) {
@@ -32,6 +38,7 @@ export default function ChatPersona() {
 
     setInput("");
     setError("");
+    setUltimoMensajeFallido(null);
     const nuevoHistorial = [...historial, { rol: "usuario", texto: msg }];
     setHistorial(nuevoHistorial);
     setCargando(true);
@@ -51,8 +58,9 @@ export default function ChatPersona() {
         audioRef.current.play().catch(() => {});
       }
     } catch (err) {
-      const msg = err?.response?.data?.error || "Error al conectar con el servidor";
-      setError(msg);
+      const msgError = err?.response?.data?.error || "Error al conectar con el servidor";
+      setError(msgError);
+      setUltimoMensajeFallido(msg);
       setHistorial(prev => prev.slice(0, -1)); // revertir el mensaje del usuario
     } finally {
       setCargando(false);
@@ -128,6 +136,7 @@ export default function ChatPersona() {
                   <span className="w-2 h-2 bg-[#D4AF37] rounded-full animate-bounce" style={{animationDelay:"150ms"}}/>
                   <span className="w-2 h-2 bg-[#D4AF37] rounded-full animate-bounce" style={{animationDelay:"300ms"}}/>
                 </div>
+                <div className="text-gray-500 text-xs italic mt-1">La IA está escribiendo...</div>
               </div>
             </div>
           )}
@@ -135,6 +144,18 @@ export default function ChatPersona() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2 text-center">
               {error}
+              {ultimoMensajeFallido && (
+                <button
+                  className="ml-2 underline"
+                  onClick={() => {
+                    setError("");
+                    setInput(ultimoMensajeFallido);
+                    setUltimoMensajeFallido(null);
+                  }}
+                >
+                  Reintentar
+                </button>
+              )}
             </div>
           )}
 
@@ -173,3 +194,4 @@ export default function ChatPersona() {
     </div>
   );
 }
+
