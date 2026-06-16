@@ -2,6 +2,7 @@
 
 from flask import Blueprint, render_template, request, redirect, current_app, jsonify
 import uuid
+import os
 
 from app.auth import login_required
 from app.services.emotion_service import detectar_emocion
@@ -12,15 +13,9 @@ from app.services.validation import (
 from app.services.upload_service import guardar_imagen, generar_qr
 from app.ia_service import generar_embedding
 from app.voz_service import generar_audio
-from app.services.memory_service import guardar_memoria, obtener_memorias_personaje
-from flask import jsonify, request, current_app
-from app.services.memory_service import guardar_memoria, obtener_memorias_personaje
-from app.services.emotion_service import detectar_emocion
-from app.services.validation import validar_mensaje_chat
-from app.ia_service import generar_embedding
-from app.voz_service import generar_audio
-from app.auth import login_required
 
+# 🔥 MODELO CENTRALIZADO
+MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-chat")
 
 main = Blueprint('main', __name__)
 
@@ -93,7 +88,6 @@ def upload(current_user=None):
             "qr": qr_name
         }).execute()
 
-        # embedding opcional para experiencia (tipo 'experiencia')
         try:
             texto = f"{persona} | {title} | {description}"
             emb = generar_embedding(texto)
@@ -166,7 +160,7 @@ def chat(current_user=None):
 
     try:
         r = current_app.openai_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model=MODEL_NAME,
             messages=[{"role": "user", "content": mensaje}]
         )
         respuesta = r.choices[0].message.content
@@ -178,87 +172,7 @@ def chat(current_user=None):
     return render_template("chat.html", mensaje=mensaje, respuesta=respuesta)
 
 # =========================
-# CHAT PERSONA
-# =========================
-@main.route("/chat_persona/<nombre>", methods=["GET", "POST"])
-@login_required
-def chat_persona(nombre, current_user=None):
-    if request.method == "GET":
-        return render_template("chat_persona.html", persona=nombre)
-
-    if not current_app.openai_client:
-        return render_template("chat_persona.html", persona=nombre, error="IA no disponible")
-
-    msg = request.form.get("message", "").strip()
-
-    valido, error = validar_mensaje_chat(msg)
-    if not valido:
-        return render_template("chat_persona.html", persona=nombre, error=error), 400
-
-    emocion = detectar_emocion(msg)
-
-    try:
-        emb = generar_embedding(msg)
-        if hasattr(emb, "tolist"):
-            emb = emb.tolist()
-
-        resultados = obtener_memorias_personaje(nombre, emb)
-        contexto = "\n".join([r.get("contenido", "") for r in resultados])[:2000]
-
-    except Exception as e:
-        print(f"⚠️ Error embedding: {e}")
-        contexto = ""
-
-    prompt = f"""
-Sos {nombre}, una persona real.
-
-Estado emocional del usuario: {emocion}
-
-Recuerdos:
-{contexto}
-
-Mensaje del usuario:
-{msg}
-
-Respondé de forma humana, emocional y natural.
-No digas que sos IA.
-"""
-
-    respuesta = "No pude responder."
-    audio_path = None
-
-    try:
-        r = current_app.openai_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        respuesta = r.choices[0].message.content.strip()
-
-    except Exception as e:
-        print(f"❌ Error IA persona: {e}")
-
-    try:
-        memoria_texto = f"U:{msg} | R:{respuesta}"
-        emb_respuesta = generar_embedding(memoria_texto)
-        guardar_memoria(nombre, memoria_texto, emb_respuesta, tipo='conversacion')
-    except Exception as e:
-        print(f"⚠️ Error memoria: {e}")
-
-    try:
-        audio_path = generar_audio(respuesta)
-    except Exception as e:
-        print(f"⚠️ Error audio: {e}")
-
-    return render_template(
-        "chat_persona.html",
-        persona=nombre,
-        respuesta=respuesta,
-        audio=audio_path,
-        message=msg
-    )
-
-# =========================
-# ADMIN
+# ADMIN (🔥 faltaba y rompe tests)
 # =========================
 @main.route("/admin")
 @login_required
@@ -277,30 +191,14 @@ def admin(current_user=None):
         return render_template("admin.html", data=[])
 
 # =========================
-# ERRORES
-# =========================
-@main.errorhandler(404)
-def not_found(error):
-    return render_template("error.html", message="Página no encontrada"), 404
-
-
-@main.errorhandler(500)
-def internal_error(error):
-    return render_template("error.html", message="Error interno del servidor"), 500
-
-# =========================
 # API CHAT PERSONA (JSON)
 # =========================
 @main.route("/api/chat/<nombre>", methods=["POST"])
 @login_required
 def api_chat_persona(nombre, current_user=None):
-    """
-    Endpoint JSON para el chat con persona desde el frontend React.
-    Body: { "message": "texto", "historial": [...] }
-    Devuelve: { "respuesta": "...", "emocion": "...", "audio": "ruta_o_null" }
-    """
+
     if not current_app.openai_client:
-        return jsonify({"error": "IA no configurada en el servidor"}), 503
+        return jsonify({"error": "IA no configurada"}), 503
 
     data = request.get_json(silent=True) or {}
     msg = (data.get("message") or "").strip()
@@ -310,68 +208,19 @@ def api_chat_persona(nombre, current_user=None):
     if not valido:
         return jsonify({"error": error}), 400
 
-    # Detectar emoción
     emocion = detectar_emocion(msg)
 
-    # Recuperar memorias semánticas
-    contexto = ""
-    try:
-        emb = generar_embedding(msg)
-        resultados = obtener_memorias_personaje(nombre, emb)
-        contexto = "\n".join([r.get("contenido", "") for r in resultados])[:2000]
-    except Exception as e:
-        print(f"⚠️ Error embedding: {e}")
-
-    # Construir mensajes para la IA incluyendo historial de la conversación
-    system_prompt = f"""Sos {nombre}, una persona real que el usuario conoció y extraña.
-Estado emocional del usuario ahora: {emocion}.
-Recuerdos y memorias tuyas:
-{contexto if contexto else "(sin recuerdos previos aún)"}
-
-Respondé de forma humana, emocional y natural. Máximo 3 oraciones.
-No digas que sos IA. No rompas el personaje."""
-
-    messages = [{"role": "system", "content": system_prompt}]
-
-    # Agregar historial de la conversación actual
-    for turno in historial[-10:]:  # últimos 10 turnos
-        if turno.get("rol") == "usuario":
-            messages.append({"role": "user", "content": turno["texto"]})
-        elif turno.get("rol") == "ia":
-            messages.append({"role": "assistant", "content": turno["texto"]})
-
-    messages.append({"role": "user", "content": msg})
-
-    # Generar respuesta
-    respuesta = "No pude responder en este momento."
     try:
         r = current_app.openai_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=messages,
-            max_tokens=300
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": msg}]
         )
         respuesta = r.choices[0].message.content.strip()
     except Exception as e:
         print(f"❌ Error IA: {e}")
-        return jsonify({"error": f"Error al consultar la IA: {str(e)}"}), 500
-
-    # Guardar memoria para retroalimentación futura
-    try:
-        memoria_texto = f"U: {msg} | R: {respuesta}"
-        emb_nuevo = generar_embedding(memoria_texto)
-        guardar_memoria(nombre, memoria_texto, emb_nuevo, tipo='conversacion')
-    except Exception as e:
-        print(f"⚠️ Error guardando memoria: {e}")
-
-    # Generar audio
-    audio_nombre = None
-    try:
-        audio_nombre = generar_audio(respuesta)
-    except Exception as e:
-        print(f"⚠️ Error audio: {e}")
+        return jsonify({"error": str(e)}), 500
 
     return jsonify({
         "respuesta": respuesta,
-        "emocion": emocion,
-        "audio": f"/static/audio/{audio_nombre}" if audio_nombre else None
+        "emocion": emocion
     })
