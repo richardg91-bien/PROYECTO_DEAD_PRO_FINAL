@@ -69,6 +69,76 @@
             margin-top: 10px;
             width: 100%;
         }
+
+        .avatar-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .avatar-image {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .avatar-image:hover {
+            transform: scale(1.04);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.45);
+        }
+
+        .avatar-image.avatar-feliz {
+            animation: breathe 2.4s ease-in-out infinite;
+            border-color: #00ff88;
+        }
+
+        .avatar-image.avatar-triste {
+            animation: sway 2.8s ease-in-out infinite;
+            border-color: #7dd3fc;
+        }
+
+        .avatar-image.avatar-enojado {
+            animation: pulse 0.6s ease-in-out infinite alternate;
+            border-color: #f87171;
+        }
+
+        .avatar-image.avatar-neutral {
+            animation: breathe 2.8s ease-in-out infinite;
+            border-color: #fbbf24;
+        }
+
+        .avatar-image.avatar-speaking {
+            animation: talk 0.7s ease-in-out infinite alternate;
+            box-shadow: 0 0 26px rgba(0, 255, 136, 0.55);
+        }
+
+        .animated-response {
+            animation: pulse 0.8s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.98); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+            50% { transform: scale(1.03); box-shadow: 0 0 28px rgba(0, 255, 136, 0.5); }
+        }
+
+        @keyframes sway {
+            0%, 100% { transform: rotate(-1deg) scale(1); }
+            50% { transform: rotate(1deg) scale(1.02); }
+        }
+
+        @keyframes talk {
+            0% { transform: scale(1) translateY(0); }
+            100% { transform: scale(1.04) translateY(-3px); }
+        }
     </style>
 </head>
 
@@ -77,6 +147,11 @@
     <h1>💬 Chat con {{ persona }}</h1>
 
     <div class="chat-box">
+        {% if avatar %}
+            <div class="avatar-wrapper">
+                <img src="{{ avatar }}" alt="Avatar de {{ persona }}" class="avatar-image avatar-{{ avatar_state or 'neutral' }} {% if respuesta %}avatar-speaking{% endif %}">
+            </div>
+        {% endif %}
 
         {% if message %}
             <div class="mensaje usuario">
@@ -85,7 +160,7 @@
         {% endif %}
 
         {% if respuesta %}
-            <div class="mensaje respuesta">
+            <div class="mensaje respuesta animated-response">
                 <strong>{{ persona }}:</strong> {{ respuesta }}
 
                 {% if audio %}
@@ -100,6 +175,7 @@
     </div>
 
     <form method="POST">
+        <input type="hidden" name="perfil" value="{{ perfil or '' }}">
         <input type="text" name="message" placeholder="Escribí un mensaje..." required>
         <button type="submit">Enviar</button>
     </form>

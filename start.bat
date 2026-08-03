@@ -1,7 +1,14 @@
 @echo off
+setlocal
+set "ROOT=%~dp0"
+set "BACKEND_PORT=%FLASK_PORT%"
+if "%BACKEND_PORT%"=="" set "BACKEND_PORT=5000"
+set "FRONTEND_PORT=%VITE_PORT%"
+if "%FRONTEND_PORT%"=="" set "FRONTEND_PORT=5173"
+
 echo Iniciando PROYECTO_DEAD_PRO_FINAL...
 
-if not exist venv\Scripts\activate (
+if not exist "%ROOT%venv\Scripts\activate" (
     echo ERROR: No se encontro el entorno virtual. Ejecuta primero:
     echo   python -m venv venv
     echo   venv\Scripts\activate
@@ -10,15 +17,16 @@ if not exist venv\Scripts\activate (
     exit /b 1
 )
 
-if not exist frontend-react\node_modules (
+if not exist "%ROOT%frontend-react\node_modules" (
     echo Instalando dependencias del frontend...
-    cd frontend-react && npm install && cd ..
+    cd /d "%ROOT%frontend-react" && npm install
 )
 
-echo Iniciando backend en http://127.0.0.1:5000
-start "Backend Flask" cmd /k "cd /d %~dp0 && venv\Scripts\activate && python run.py"
+echo Iniciando backend en http://127.0.0.1:%BACKEND_PORT%
+start "Backend Flask" cmd /k "cd /d "%ROOT%" && call venv\Scripts\activate && set FLASK_ENV=development && python run.py"
 
-echo Iniciando frontend en http://127.0.0.1:5173
-start "Frontend React" cmd /k "cd /d %~dp0\frontend-react && npm run dev"
+echo Iniciando frontend en http://127.0.0.1:%FRONTEND_PORT%
+start "Frontend React" cmd /k "cd /d "%ROOT%frontend-react" && set VITE_API_URL=http://127.0.0.1:%BACKEND_PORT% && npm run dev -- --host 127.0.0.1 --port %FRONTEND_PORT%"
 
-echo Listo. Abre http://127.0.0.1:5173 en tu navegador.
+echo Listo. Abre http://127.0.0.1:%FRONTEND_PORT% en tu navegador.
+endlocal

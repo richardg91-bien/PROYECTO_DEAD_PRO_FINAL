@@ -3,10 +3,18 @@
 from flask import Blueprint, render_template, request, redirect, current_app, jsonify
 import uuid
 import os
+from app.services.vision_service import describir_imagen
 
 from app.auth import login_required
 from app.services.emotion_service import detectar_emocion
-from app.services.memory_service import guardar_memoria, obtener_memorias_personaje
+from app.services.memory_service import (
+    guardar_memoria,
+    obtener_memorias_personaje,
+    construir_contexto_persona,
+    construir_prompt_memorial,
+    construir_url_avatar,
+    obtener_estado_avatar,
+)
 from app.services.validation import (
     validar_archivo_imagen, validar_form_upload, validar_mensaje_chat
 )
@@ -21,7 +29,6 @@ main = Blueprint('main', __name__)
 
 # =========================
 # DEBUG
-# =========================
 @main.route("/debug")
 def debug():
     return {
@@ -31,14 +38,12 @@ def debug():
 
 # =========================
 # HOME
-# =========================
 @main.route("/")
 def index():
     return render_template("index.html")
 
 # =========================
 # API TEST
-# =========================
 @main.route("/api/test")
 def api_test():
     return jsonify({
@@ -46,9 +51,17 @@ def api_test():
         "mensaje": "Proyecto Dead conectado correctamente"
     })
 
+
+@main.route("/health")
+def health():
+    return jsonify({
+        "status": "ok",
+        "service": "dead-pro",
+        "environment": current_app.config.get("ENV", "development")
+    })
+
 # =========================
 # UPLOAD
-# =========================
 @main.route("/upload", methods=["GET", "POST"])
 @login_required
 def upload(current_user=None):
@@ -73,12 +86,11 @@ def upload(current_user=None):
 
     try:
         uid = str(uuid.uuid4())
-
         filename = guardar_imagen(file)
-
         qr_url = f"{request.host_url.rstrip('/')}/experiencia/{uid}"
         qr_name = generar_qr(qr_url)
 
+        # Inserta la experiencia primero sin descripción IA
         current_app.supabase.table("experiences").insert({
             "id": uid,
             "persona": persona,
@@ -88,12 +100,33 @@ def upload(current_user=None):
             "qr": qr_name
         }).execute()
 
+        # ===============================
+        # Análisis de imagen usando visión IA
+        # ===============================
+        descripcion_ia = None
+        try:
+            descripcion_ia = describir_imagen(filename)  # Ruta o URL accesible
+            current_app.supabase.table("experiences").update({
+                "ai_description": descripcion_ia
+            }).eq("id", uid).execute()
+
+            emb = generar_embedding(descripcion_ia)
+            guardar_memoria(persona, descripcion_ia, emb, tipo='experiencia')
+
+        except Exception as e:
+            print(f"⚠️ Error en análisis de imagen: {e}")
+
+        # También guardar la memoria del texto base (title + desc)
         try:
             texto = f"{persona} | {title} | {description}"
             emb = generar_embedding(texto)
             guardar_memoria(persona, texto, emb, tipo='experiencia')
+
+            perfil_inicial = construir_perfil_inicial(persona, descripcion_ia, title, description)
+            emb_perfil = generar_embedding(perfil_inicial)
+            guardar_memoria(persona, perfil_inicial, emb_perfil, tipo='experiencia')
         except Exception as e:
-            print(f"⚠️ Error embedding: {e}")
+            print(f"⚠️ Error embedding texto experiencia: {e}")
 
         return redirect("/")
 
@@ -103,7 +136,6 @@ def upload(current_user=None):
 
 # =========================
 # API EXPERIENCIAS
-# =========================
 @main.route("/api/experiencias")
 def api_experiencias():
     try:
@@ -121,7 +153,6 @@ def api_experiencias():
 
 # =========================
 # API EXPERIENCIA
-# =========================
 @main.route("/api/experiencia/<id>")
 def api_experiencia(id):
     try:
@@ -142,7 +173,6 @@ def api_experiencia(id):
 
 # =========================
 # CHAT SIMPLE
-# =========================
 @main.route("/chat", methods=["GET", "POST"])
 @login_required
 def chat(current_user=None):
@@ -172,8 +202,88 @@ def chat(current_user=None):
     return render_template("chat.html", mensaje=mensaje, respuesta=respuesta)
 
 # =========================
-# ADMIN (🔥 faltaba y rompe tests)
+# CHAT PERSONA
+@main.route("/chat_persona/<nombre>", methods=["GET", "POST"])
+@login_required
+def chat_persona(nombre, current_user=None):
+    if request.method == "GET":
+        return render_template("chat_persona.html", persona=nombre)
+
+    if not current_app.openai_client:
+        return render_template("chat_persona.html", persona=nombre, error="IA no disponible")
+
+    msg = request.form.get("message", "").strip()
+
+    valido, error = validar_mensaje_chat(msg)
+    if not valido:
+        return render_template("chat_persona.html", persona=nombre, error=error), 400
+
+    emocion = detectar_emocion(msg)
+
+    perfil_texto = request.form.get("perfil", "")
+
+    try:
+        emb = generar_embedding(msg)
+        if hasattr(emb, "tolist"):
+            emb = emb.tolist()
+
+        resultados = obtener_memorias_personaje(nombre, emb)
+        contexto = construir_contexto_persona(nombre, resultados, perfil_texto or f"{nombre} es una persona interesante y expresiva")
+
+    except Exception as e:
+        print(f"⚠️ Error embedding: {e}")
+        contexto = construir_contexto_persona(nombre, [], perfil_texto or f"{nombre} es una persona interesante y expresiva")
+
+    prompt = construir_prompt_memorial(
+        nombre,
+        contexto,
+        msg,
+        emocion,
+    )
+
+    respuesta = "No pude responder."
+    audio_path = None
+
+    try:
+        r = current_app.openai_client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        respuesta = r.choices[0].message.content.strip()
+
+    except Exception as e:
+        print(f"❌ Error IA persona: {e}")
+
+    try:
+        memoria_texto = f"U:{msg} | R:{respuesta}"
+        emb_respuesta = generar_embedding(memoria_texto)
+        guardar_memoria(nombre, memoria_texto, emb_respuesta, tipo='conversacion')
+    except Exception as e:
+        print(f"⚠️ Error memoria: {e}")
+
+    try:
+        audio_path = generar_audio(respuesta, emocion=emocion)
+    except Exception as e:
+        print(f"⚠️ Error audio: {e}")
+
+    avatar = construir_url_avatar(None)
+    try:
+        avatar = construir_url_avatar(filename)
+    except Exception:
+        avatar = construir_url_avatar(None)
+
+    return render_template(
+        "chat_persona.html",
+        persona=nombre,
+        respuesta=respuesta,
+        audio=audio_path,
+        message=msg,
+        avatar=avatar,
+        avatar_state=obtener_estado_avatar(emocion),
+    )
+
 # =========================
+# ADMIN
 @main.route("/admin")
 @login_required
 def admin(current_user=None):
@@ -191,8 +301,18 @@ def admin(current_user=None):
         return render_template("admin.html", data=[])
 
 # =========================
-# API CHAT PERSONA (JSON)
+# ERRORES
+@main.errorhandler(404)
+def not_found(error):
+    return render_template("error.html", message="Página no encontrada"), 404
+
+
+@main.errorhandler(500)
+def internal_error(error):
+    return render_template("error.html", message="Error interno del servidor"), 500
+
 # =========================
+# API CHAT PERSONA (JSON)
 @main.route("/api/chat/<nombre>", methods=["POST"])
 @login_required
 def api_chat_persona(nombre, current_user=None):
