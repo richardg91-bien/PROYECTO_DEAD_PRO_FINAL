@@ -49,13 +49,17 @@ export default function ChatPersona() {
         historial: nuevoHistorial,
       });
 
-      const { respuesta, emocion: em, audio } = res.data;
+      const { respuesta, emocion: em, audio, avatar_state } = res.data;
       setEmocion(em || "neutral");
       setHistorial(prev => [...prev, { rol: "ia", texto: respuesta }]);
 
       if (audio && audioRef.current) {
-        audioRef.current.src = baseUrl + audio;
+        audioRef.current.src = `${baseUrl}${audio}`;
         audioRef.current.play().catch(() => {});
+      }
+
+      if (avatar_state) {
+        setEmocion(avatar_state);
       }
     } catch (err) {
       const msgError = err?.response?.data?.error || "Error al conectar con el servidor";

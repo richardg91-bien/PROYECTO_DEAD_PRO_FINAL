@@ -330,6 +330,9 @@ def api_chat_persona(nombre, current_user=None):
 
     emocion = detectar_emocion(msg)
 
+    respuesta = "No pude responder."
+    audio_path = None
+
     try:
         r = current_app.openai_client.chat.completions.create(
             model=MODEL_NAME,
@@ -340,7 +343,14 @@ def api_chat_persona(nombre, current_user=None):
         print(f"❌ Error IA: {e}")
         return jsonify({"error": str(e)}), 500
 
+    try:
+        audio_path = generar_audio(respuesta, emocion=emocion)
+    except Exception as e:
+        print(f"⚠️ Error audio API: {e}")
+
     return jsonify({
         "respuesta": respuesta,
-        "emocion": emocion
+        "emocion": emocion,
+        "audio": f"/static/audio/{audio_path}" if audio_path else None,
+        "avatar_state": obtener_estado_avatar(emocion),
     })

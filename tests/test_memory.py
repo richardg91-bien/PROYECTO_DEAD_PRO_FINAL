@@ -22,3 +22,5 @@ def test_api_chat(client, auth_headers):
     data = response.get_json()
     assert "respuesta" in data
     assert "emocion" in data
+    assert "audio" in data
+    assert "avatar_state" in data
