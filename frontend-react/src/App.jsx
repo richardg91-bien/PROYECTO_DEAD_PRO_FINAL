@@ -1,3 +1,4 @@
+import './styles/memorial.css';
 import AppRoutes from "./routes/AppRoutes";
 
 function App() {

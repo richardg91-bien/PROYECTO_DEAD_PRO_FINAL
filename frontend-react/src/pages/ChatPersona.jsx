@@ -1,201 +1,253 @@
-import { useState, useRef, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import api from "../services/api";
+import React, { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Send, Mic, MicOff, Volume2, Copy } from 'lucide-react';
+import { Header } from '../components/Common/Header';
+import { Footer } from '../components/Common/Footer';
+import { AnimatedAvatar } from '../components/Avatar/AnimatedAvatar';
+import { ChatBubble, UserBubble, AssistantBubble } from '../components/ChatBubble/ChatBubble';
+import api from '../services/api';
+import '../styles/memorial.css';
+import './ChatPersona.css';
 
-const EMOJIS = { triste: "😢", feliz: "😊", enojado: "😠", neutral: "😌" };
-const COLORES = {
-  triste:  "bg-blue-50  border-blue-200  text-blue-700",
-  feliz:   "bg-green-50 border-green-200 text-green-700",
-  enojado: "bg-red-50   border-red-200   text-red-700",
-  neutral: "bg-gray-50  border-gray-200  text-gray-600",
-};
-
-export default function ChatPersona() {
+const ChatPersona = () => {
   const { nombre } = useParams();
+  const navigate = useNavigate();
   const [historial, setHistorial] = useState([]);
-  const [input, setInput]         = useState("");
-  const [cargando, setCargando]   = useState(false);
-  const [emocion, setEmocion]     = useState("neutral");
-  const [error, setError]         = useState("");
-  const [ultimoMensajeFallido, setUltimoMensajeFallido] = useState(null);
-  const audioRef  = useRef(null);
+  const [input, setInput] = useState('');
+  const [cargando, setCargando] = useState(false);
+  const [emocion, setEmocion] = useState('neutral');
+  const [error, setError] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [personaData, setPersonaData] = useState(null);
+  
+  const audioRef = useRef(null);
   const bottomRef = useRef(null);
-  const baseUrl   = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 
   useEffect(() => {
-    const contenedor = bottomRef.current?.parentElement;
-    if (!contenedor) return;
-    const distanciaAlFinal = contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight;
-    if (distanciaAlFinal < 100) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    // Scroll to bottom when new messages arrive
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [historial, cargando]);
 
-  async function enviar(e) {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     const msg = input.trim();
     if (!msg || cargando) return;
 
-    setInput("");
-    setError("");
-    setUltimoMensajeFallido(null);
-    const nuevoHistorial = [...historial, { rol: "usuario", texto: msg }];
+    setInput('');
+    setError('');
+    const nuevoHistorial = [...historial, { rol: 'usuario', texto: msg, timestamp: new Date() }];
     setHistorial(nuevoHistorial);
     setCargando(true);
 
     try {
       const res = await api.post(`/api/chat/${encodeURIComponent(nombre)}`, {
-        message:  msg,
+        message: msg,
         historial: nuevoHistorial,
       });
 
-      const { respuesta, emocion: em, audio, avatar_state } = res.data;
-      setEmocion(em || "neutral");
-      setHistorial(prev => [...prev, { rol: "ia", texto: respuesta }]);
+      const { respuesta, emocion: em, audio } = res.data;
+      setEmocion(em || 'neutral');
+      setHistorial((prev) => [
+        ...prev,
+        { rol: 'ia', texto: respuesta, emotion: em, audio, timestamp: new Date() },
+      ]);
 
-      if (audio && audioRef.current) {
-        audioRef.current.src = `${baseUrl}${audio}`;
-        audioRef.current.play().catch(() => {});
-      }
-
-      if (avatar_state) {
-        setEmocion(avatar_state);
+      if (audio) {
+        audioRef.current = new Audio(`${baseUrl}${audio}`);
+        audioRef.current.play().catch((err) => console.log('Audio play error:', err));
       }
     } catch (err) {
-      const msgError = err?.response?.data?.error || "Error al conectar con el servidor";
+      const msgError = err?.response?.data?.error || 'Error al conectar con el servidor';
       setError(msgError);
-      setUltimoMensajeFallido(msg);
-      setHistorial(prev => prev.slice(0, -1)); // revertir el mensaje del usuario
     } finally {
       setCargando(false);
     }
-  }
+  };
+
+  const handlePlayAudio = (audioPath) => {
+    if (audioPath && audioRef.current) {
+      audioRef.current.src = `${baseUrl}${audioPath}`;
+      audioRef.current.play().catch((err) => console.log('Error playing audio:', err));
+    }
+  };
+
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 via-white to-amber-50/30 flex flex-col">
+    <div className="chat-persona">
+      <Header isAuthenticated={true} userName={nombre} />
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#D4AF37]/20 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <Link to="/dashboard" className="text-gray-400 hover:text-[#D4AF37] transition-colors p-1">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-            </svg>
-          </Link>
-
-          {/* Avatar */}
-          <div className="w-9 h-9 rounded-full border-2 border-[#D4AF37] flex items-center justify-center bg-amber-50 text-[#8A5A00] font-bold text-sm">
-            {nombre.charAt(0).toUpperCase()}
+      <div className="chat-persona-container">
+        {/* Avatar Panel */}
+        <motion.div
+          className="chat-persona-avatar-panel"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="avatar-section">
+            <h3>Memorial de {nombre}</h3>
+            <AnimatedAvatar emotion={emocion} isActive={cargando} />
           </div>
 
-          <div className="flex-1 min-w-0">
-            <p className="font-serif font-bold text-gray-800 text-sm truncate">{nombre}</p>
-            <p className={`text-xs flex items-center gap-1 border rounded-full px-2 py-0.5 w-fit ${COLORES[emocion]}`}>
-              <span>{EMOJIS[emocion]}</span>
-              <span className="capitalize">{emocion}</span>
-            </p>
+          <div className="persona-bio">
+            <div className="bio-item">
+              <span className="bio-label">Estado</span>
+              <span className="bio-value capitalize">{emocion}</span>
+            </div>
+            <div className="bio-item">
+              <span className="bio-label">Mensajes</span>
+              <span className="bio-value">{historial.length}</span>
+            </div>
+            <div className="bio-item">
+              <span className="bio-label">Conversación</span>
+              <span className="bio-value">Activa</span>
+            </div>
           </div>
-        </div>
-      </header>
 
-      {/* Mensajes */}
-      <main className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-2xl mx-auto space-y-4">
-
-          {historial.length === 0 && (
-            <div className="text-center py-16">
-              <div className="text-5xl mb-3">💬</div>
-              <p className="text-gray-400 text-sm">
-                Comenzá a hablar con <span className="font-semibold text-gray-600">{nombre}</span>.<br/>
-                La IA aprenderá de cada conversación.
-              </p>
-            </div>
-          )}
-
-          {historial.map((m, i) => (
-            <div key={i} className={`flex ${m.rol === "usuario" ? "justify-end" : "justify-start"}`}>
-              {m.rol === "ia" && (
-                <div className="w-7 h-7 rounded-full border-2 border-[#D4AF37] flex items-center justify-center bg-amber-50 text-[#8A5A00] font-bold text-xs mr-2 flex-shrink-0 self-end">
-                  {nombre.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm
-                ${m.rol === "usuario"
-                  ? "bg-[#D4AF37] text-white rounded-br-sm"
-                  : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm"
-                }`}>
-                {m.texto}
-              </div>
-            </div>
-          ))}
-
-          {cargando && (
-            <div className="flex justify-start">
-              <div className="w-7 h-7 rounded-full border-2 border-[#D4AF37] flex items-center justify-center bg-amber-50 text-[#8A5A00] font-bold text-xs mr-2 flex-shrink-0 self-end">
-                {nombre.charAt(0).toUpperCase()}
-              </div>
-              <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-                <div className="flex gap-1 items-center h-4">
-                  <span className="w-2 h-2 bg-[#D4AF37] rounded-full animate-bounce" style={{animationDelay:"0ms"}}/>
-                  <span className="w-2 h-2 bg-[#D4AF37] rounded-full animate-bounce" style={{animationDelay:"150ms"}}/>
-                  <span className="w-2 h-2 bg-[#D4AF37] rounded-full animate-bounce" style={{animationDelay:"300ms"}}/>
-                </div>
-                <div className="text-gray-500 text-xs italic mt-1">La IA está escribiendo...</div>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-4 py-2 text-center">
-              {error}
-              {ultimoMensajeFallido && (
-                <button
-                  className="ml-2 underline"
-                  onClick={() => {
-                    setError("");
-                    setInput(ultimoMensajeFallido);
-                    setUltimoMensajeFallido(null);
-                  }}
-                >
-                  Reintentar
-                </button>
-              )}
-            </div>
-          )}
-
-          <div ref={bottomRef}/>
-        </div>
-      </main>
-
-      {/* Input */}
-      <div className="sticky bottom-0 bg-white/90 backdrop-blur-md border-t border-gray-100 px-4 py-3">
-        <form onSubmit={enviar} className="max-w-2xl mx-auto flex gap-2 items-end">
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(e); }}}
-            placeholder={`Escribile a ${nombre}...`}
-            rows={1}
-            disabled={cargando}
-            className="flex-1 resize-none px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all disabled:opacity-50"
-            style={{maxHeight:"120px", overflowY:"auto"}}
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || cargando}
-            className="w-11 h-11 rounded-full flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100 flex-shrink-0"
-            style={{ background: "linear-gradient(to right, #C4973B, #D4A853)" }}
+          <motion.button
+            className="btn btn-secondary"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/galeria')}
           >
-            <svg className="w-5 h-5 text-white rotate-90" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
-          </button>
-        </form>
+            Volver al Muro
+          </motion.button>
+        </motion.div>
+
+        {/* Chat Panel */}
+        <motion.div
+          className="chat-persona-chat-panel"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {/* Chat Header */}
+          <div className="chat-header">
+            <div>
+              <h2>{nombre}</h2>
+              <div className="chat-status">
+                <div className="chat-status-indicator" />
+                {cargando ? 'Escribiendo...' : 'En línea'}
+              </div>
+            </div>
+          </div>
+
+          {/* Chat Messages */}
+          <div className="chat-messages">
+            {historial.length === 0 && (
+              <motion.div
+                style={{ textAlign: 'center', margin: 'auto' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💬</div>
+                <p style={{ color: 'var(--accent-sepia)' }}>
+                  Comienza a conversar con el memorial de {nombre}
+                </p>
+                <p style={{ fontSize: '0.9rem', color: 'rgba(212, 175, 55, 0.6)', marginTop: '0.5rem' }}>
+                  La IA aprenderá de cada conversación para brindarte respuestas más personalizadas
+                </p>
+              </motion.div>
+            )}
+
+            {historial.map((msg, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                {msg.rol === 'usuario' ? (
+                  <UserBubble message={msg.texto} timestamp={msg.timestamp} />
+                ) : (
+                  <AssistantBubble
+                    message={msg.texto}
+                    emotion={msg.emotion}
+                    timestamp={msg.timestamp}
+                    hasAudio={!!msg.audio}
+                    onPlayAudio={() => handlePlayAudio(msg.audio)}
+                    onCopy={() => handleCopy(msg.texto)}
+                  />
+                )}
+              </motion.div>
+            ))}
+
+            {cargando && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="shimmer-loading"
+                style={{
+                  height: '40px',
+                  borderRadius: '12px',
+                  marginBottom: '1rem',
+                }}
+              />
+            )}
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                style={{
+                  padding: '1rem',
+                  background: 'rgba(200, 90, 84, 0.2)',
+                  border: '1px solid rgba(200, 90, 84, 0.4)',
+                  borderRadius: '8px',
+                  color: '#c85a54',
+                  textAlign: 'center',
+                  fontSize: '0.9rem',
+                }}
+              >
+                {error}
+              </motion.div>
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Chat Input */}
+          <form onSubmit={handleSendMessage} className="chat-input-area">
+            <div className="chat-input-wrapper">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage(e);
+                  }
+                }}
+                placeholder="Escribe tu mensaje o pregunta... (Shift+Enter para nueva línea)"
+                disabled={cargando}
+              />
+            </div>
+
+            <div className="chat-input-actions">
+              <motion.button
+                type="submit"
+                className="btn chat-send-btn"
+                disabled={!input.trim() || cargando}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Send size={18} />
+              </motion.button>
+            </div>
+          </form>
+        </motion.div>
       </div>
 
-      {/* Audio player oculto */}
-      <audio ref={audioRef} className="hidden"/>
+      <Footer />
     </div>
   );
-}
+};
+
+export default ChatPersona;
+
 

@@ -34,6 +34,9 @@ def register():
     Body JSON: { email, password }
     Crea el usuario en Supabase Auth.
     """
+    if not hasattr(current_app, "supabase") or current_app.supabase is None:
+        return jsonify({"error": "Supabase no está disponible. Revisa la configuración del backend."}), 500
+
     data = request.get_json(silent=True) or {}
     email    = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
@@ -66,7 +69,7 @@ def register():
     except Exception as e:
         error, status = _auth_error_message(e)
         print(f"Error register: {e}")
-        return jsonify({"error": error}), status
+        return jsonify({"error": error, "detail": str(e)}), status
 
 
 # ─────────────────────────────────────────
@@ -78,6 +81,9 @@ def login():
     Body JSON: { email, password }
     Retorna access_token y refresh_token.
     """
+    if not hasattr(current_app, "supabase") or current_app.supabase is None:
+        return jsonify({"error": "Supabase no está disponible. Revisa la configuración del backend."}), 500
+
     data = request.get_json(silent=True) or {}
     email    = (data.get("email") or "").strip()
     password = (data.get("password") or "").strip()
@@ -108,7 +114,7 @@ def login():
         if "invalid login" in msg or "invalid credentials" in msg:
             return jsonify({"error": "Email o contraseña incorrectos"}), 401
         print(f"❌ Error login: {e}")
-        return jsonify({"error": "Error al iniciar sesión"}), 500
+        return jsonify({"error": "Error al iniciar sesión", "detail": str(e)}), 500
 
 
 # ─────────────────────────────────────────

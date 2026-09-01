@@ -3,6 +3,7 @@
 from flask import Blueprint, render_template, request, redirect, current_app, jsonify
 import uuid
 import os
+from dotenv import load_dotenv
 from app.services.vision_service import describir_imagen
 
 from app.auth import login_required
@@ -22,10 +23,57 @@ from app.services.upload_service import guardar_imagen, generar_qr
 from app.ia_service import generar_embedding
 from app.voz_service import generar_audio
 
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=False)
+
 # 🔥 MODELO CENTRALIZADO
-MODEL_NAME = os.getenv("MODEL_NAME", "deepseek-chat")
+DEFAULT_MODEL = "llama-3.1-8b-instant"
+MODEL_NAME = os.getenv("MODEL_NAME", DEFAULT_MODEL)
+MODEL_FALLBACKS = [
+    os.getenv("MODEL_NAME", DEFAULT_MODEL),
+    "llama-3.1-8b-instant",
+    "llama-3.3-70b-versatile",
+]
 
 main = Blueprint('main', __name__)
+
+
+def obtener_respuesta_ia(client, mensaje, modelo_inicial=None):
+    """Intenta responder con un modelo principal y hace fallback a modelos compatibles."""
+    modelos = []
+    if modelo_inicial:
+        modelos.append(modelo_inicial)
+    modelos.extend([m for m in MODEL_FALLBACKS if m and m not in modelos])
+
+    ultimo_error = None
+
+    for modelo in modelos:
+        try:
+            r = client.chat.completions.create(
+                model=modelo,
+                messages=[{"role": "user", "content": mensaje}]
+            )
+            return r.choices[0].message.content.strip(), modelo
+        except Exception as e:
+            ultimo_error = e
+            mensaje_error = str(e).lower()
+            codigo_error = getattr(e, "code", None)
+            status_code = getattr(e, "status_code", None)
+            cuerpo_error = getattr(e, "body", None)
+            cuerpo_error_str = str(cuerpo_error).lower() if cuerpo_error is not None else ""
+
+            if (
+                "model_not_found" in mensaje_error
+                or "does not exist" in mensaje_error
+                or codigo_error == "model_not_found"
+                or status_code == 404
+                or "model_not_found" in cuerpo_error_str
+            ):
+                continue
+            raise
+
+    if ultimo_error is not None:
+        raise ultimo_error
+    raise RuntimeError("No se pudo obtener respuesta de IA")
 
 # =========================
 # DEBUG
@@ -189,12 +237,7 @@ def chat(current_user=None):
         return render_template("chat.html", error=error), 400
 
     try:
-        r = current_app.openai_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": mensaje}]
-        )
-        respuesta = r.choices[0].message.content
-
+        respuesta, _ = obtener_respuesta_ia(current_app.openai_client, mensaje, modelo_inicial=MODEL_NAME)
     except Exception as e:
         print(f"❌ Error IA: {e}")
         respuesta = "Error al consultar IA"
@@ -245,12 +288,7 @@ def chat_persona(nombre, current_user=None):
     audio_path = None
 
     try:
-        r = current_app.openai_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        respuesta = r.choices[0].message.content.strip()
-
+        respuesta, _ = obtener_respuesta_ia(current_app.openai_client, prompt, modelo_inicial=MODEL_NAME)
     except Exception as e:
         print(f"❌ Error IA persona: {e}")
 
@@ -334,11 +372,7 @@ def api_chat_persona(nombre, current_user=None):
     audio_path = None
 
     try:
-        r = current_app.openai_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": msg}]
-        )
-        respuesta = r.choices[0].message.content.strip()
+        respuesta, _ = obtener_respuesta_ia(current_app.openai_client, msg, modelo_inicial=MODEL_NAME)
     except Exception as e:
         print(f"❌ Error IA: {e}")
         return jsonify({"error": str(e)}), 500

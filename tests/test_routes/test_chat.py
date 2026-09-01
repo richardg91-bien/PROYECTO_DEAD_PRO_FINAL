@@ -1,4 +1,15 @@
+import importlib
 from unittest.mock import MagicMock
+
+
+def test_default_model_uses_groq_compatible_option(monkeypatch):
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    import app.routes as routes
+
+    reloaded_routes = importlib.reload(routes)
+
+    assert reloaded_routes.MODEL_NAME == "llama-3.1-8b-instant"
+
 
 def test_chat_post_uses_deepseek_model(client, app, auth_headers):
     response_mock = MagicMock()

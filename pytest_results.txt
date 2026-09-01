@@ -1,0 +1,85 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.5, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\richa\AppData\Local\Programs\Python\Python311\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\richa\OneDrive\Desktop\PROYECTO_DEAD_PRO_FINAL
+configfile: pytest.ini
+plugins: anyio-4.13.0, flask-1.3.0, mock-3.15.1
+collecting ... collected 52 items
+
+tests/test_chat_post_uses_deepseek_model.py::test_chat_post_uses_deepseek_model FAILED [  1%]
+tests/test_integration/test_routes_integration.py::test_protected_routes_reject_missing_token PASSED [  3%]
+tests/test_integration/test_routes_integration.py::test_debug_route_reports_clients PASSED [  5%]
+tests/test_integration/test_routes_integration.py::test_auth_me_with_token PASSED [  7%]
+tests/test_memory.py::test_guardar_y_obtener_memoria PASSED              [  9%]
+tests/test_memory.py::test_api_chat PASSED                               [ 11%]
+tests/test_routes/test_chat.py::test_default_model_uses_groq_compatible_option PASSED [ 13%]
+tests/test_routes/test_chat.py::test_chat_post_uses_deepseek_model PASSED [ 15%]
+tests/test_routes/test_galeria.py::test_api_experiencias_returns_supabase_data PASSED [ 17%]
+tests/test_routes/test_galeria.py::test_api_experiencia_not_found PASSED [ 19%]
+tests/test_routes/test_galeria.py::test_api_experiencia_found PASSED     [ 21%]
+tests/test_routes/test_index.py::test_index_route PASSED                 [ 23%]
+tests/test_routes/test_index.py::test_api_test_route PASSED              [ 25%]
+tests/test_routes/test_index.py::test_upload_requires_auth PASSED        [ 26%]
+tests/test_routes/test_index.py::test_chat_requires_auth PASSED          [ 28%]
+tests/test_routes/test_index.py::test_admin_requires_auth PASSED         [ 30%]
+tests/test_routes/test_index.py::test_health_route PASSED                [ 32%]
+tests/test_routes/test_index.py::test_production_requires_secret_key FAILED [ 34%]
+tests/test_routes/test_upload.py::test_upload_get_authenticated PASSED   [ 36%]
+tests/test_routes/test_upload.py::test_upload_missing_file PASSED        [ 38%]
+tests/test_routes/test_upload.py::test_upload_calls_supabase_insert PASSED [ 40%]
+tests/test_unit/test_chat_persona_template.py::test_chat_persona_template_incluye_animacion_hablante PASSED [ 42%]
+tests/test_unit/test_detectar_emocion.py::TestDetectarEmocion::test_detectar_emocion_sad PASSED [ 44%]
+tests/test_unit/test_detectar_emocion.py::TestDetectarEmocion::test_detectar_emocion_happy PASSED [ 46%]
+tests/test_unit/test_detectar_emocion.py::TestDetectarEmocion::test_detectar_emocion_angry PASSED [ 48%]
+tests/test_unit/test_detectar_emocion.py::TestDetectarEmocion::test_detectar_emocion_neutral PASSED [ 50%]
+tests/test_unit/test_detectar_emocion.py::TestDetectarEmocion::test_detectar_emocion_case_insensitive PASSED [ 51%]
+tests/test_unit/test_detectar_emocion.py::TestDetectarEmocion::test_detectar_emocion_mixed_emotions PASSED [ 53%]
+tests/test_unit/test_detectar_emocion.py::TestDetectarEmocion::test_detectar_emocion_partial_match PASSED [ 55%]
+tests/test_unit/test_detectar_emocion.py::TestDetectarEmocion::test_detectar_emocion_all_keywords PASSED [ 57%]
+tests/test_unit/test_emotion_service.py::TestDetectarEmocion::test_detecta_triste PASSED [ 59%]
+tests/test_unit/test_emotion_service.py::TestDetectarEmocion::test_detecta_feliz PASSED [ 61%]
+tests/test_unit/test_emotion_service.py::TestDetectarEmocion::test_detecta_enojado PASSED [ 63%]
+tests/test_unit/test_emotion_service.py::TestDetectarEmocion::test_detecta_neutral PASSED [ 65%]
+tests/test_unit/test_emotion_service.py::TestDetectarEmocion::test_case_insensitive PASSED [ 67%]
+tests/test_unit/test_model_fallback.py::test_obtener_respuesta_ia_fallback_a_modelo_disponible PASSED [ 69%]
+tests/test_unit/test_model_fallback.py::test_obtener_respuesta_ia_fallback_con_error_404_de_modelo PASSED [ 71%]
+tests/test_unit/test_persona_profile.py::test_construir_contexto_persona_incluye_perfil_y_memorias PASSED [ 73%]
+tests/test_unit/test_persona_profile.py::test_construir_perfil_inicial_sintetiza_informacion PASSED [ 75%]
+tests/test_unit/test_persona_profile.py::test_construir_prompt_memorial_incluye_saludo_y_pregunta_personal PASSED [ 76%]
+tests/test_unit/test_persona_profile.py::test_construir_url_avatar_devuelve_ruta_estatica PASSED [ 78%]
+tests/test_unit/test_validation.py::TestValidarFormUpload::test_valida_form_correcto PASSED [ 80%]
+tests/test_unit/test_validation.py::TestValidarFormUpload::test_rechaza_persona_vacia PASSED [ 82%]
+tests/test_unit/test_validation.py::TestValidarFormUpload::test_rechaza_persona_muy_corta PASSED [ 84%]
+tests/test_unit/test_validation.py::TestValidarFormUpload::test_rechaza_persona_muy_larga PASSED [ 86%]
+tests/test_unit/test_validation.py::TestValidarFormUpload::test_rechaza_titulo_muy_corto PASSED [ 88%]
+tests/test_unit/test_validation.py::TestValidarFormUpload::test_rechaza_descripcion_muy_corta PASSED [ 90%]
+tests/test_unit/test_validation.py::TestValidarMensajeChat::test_valida_mensaje_correcto PASSED [ 92%]
+tests/test_unit/test_validation.py::TestValidarMensajeChat::test_rechaza_mensaje_vacio PASSED [ 94%]
+tests/test_unit/test_validation.py::TestValidarMensajeChat::test_rechaza_mensaje_none PASSED [ 96%]
+tests/test_unit/test_validation.py::TestValidarMensajeChat::test_rechaza_mensaje_muy_largo PASSED [ 98%]
+tests/test_unit/test_voz_service.py::test_generar_audio_adapta_el_texto_a_la_emocion PASSED [100%]
+
+================================== FAILURES ===================================
+_____________________ test_chat_post_uses_deepseek_model ______________________
+tests\test_chat_post_uses_deepseek_model.py:19: in test_chat_post_uses_deepseek_model
+    assert call_kwargs["model"] == "deepseek-chat"
+E   AssertionError: assert 'llama-3.1-8b-instant' == 'deepseek-chat'
+E     
+E     - deepseek-chat
+E     + llama-3.1-8b-instant
+_____________________ test_production_requires_secret_key _____________________
+tests\test_routes\test_index.py:49: in test_production_requires_secret_key
+    with pytest.raises(ValueError, match="SECRET_KEY"):
+E   Failed: DID NOT RAISE <class 'ValueError'>
+---------------------------- Captured stdout call -----------------------------
+Warning: no se pudo inicializar Supabase: Invalid API key
+============================== warnings summary ===============================
+..\..\..\AppData\Local\Programs\Python\Python311\Lib\site-packages\gotrue\types.py:679: 19 warnings
+  C:\Users\richa\AppData\Local\Programs\Python\Python311\Lib\site-packages\gotrue\types.py:679: PydanticDeprecatedSince20: The `update_forward_refs` method is deprecated; use `model_rebuild` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    model.update_forward_refs()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_chat_post_uses_deepseek_model.py::test_chat_post_uses_deepseek_model
+FAILED tests/test_routes/test_index.py::test_production_requires_secret_key
+================== 2 failed, 50 passed, 19 warnings in 6.17s ==================
