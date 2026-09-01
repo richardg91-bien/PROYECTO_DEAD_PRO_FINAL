@@ -2,7 +2,7 @@
 Tests para la función detectar_emocion()
 """
 import pytest
-from app.routes import detectar_emocion
+from app.services.emotion_service import detectar_emocion
 
 
 class TestDetectarEmocion:
