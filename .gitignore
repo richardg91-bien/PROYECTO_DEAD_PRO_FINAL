@@ -12,20 +12,27 @@ __pycache__/
 dist/
 build/
 *.egg
+.mypy_cache/
+.pytest_cache/
 
 # ── Entorno ──────────────────────────────────────────────
 .env
 *.env.local
+.env.local
+.env.*.local
 
 # ── Base de datos local ──────────────────────────────────
 *.db
 database.db
+*.sqlite
+*.sqlite3
 
 # ── Tests / CI ───────────────────────────────────────────
 .pytest_cache/
 htmlcov/
 .coverage
 coverage.xml
+.tox/
 
 # ── Archivos generados en runtime ───────────────────────
 static/audio/
@@ -38,6 +45,7 @@ frontend-react/node_modules/
 frontend-react/dist/
 frontend-react/.env
 frontend-react/.env.local
+frontend-react/.env.*.local
 
 # Copias duplicadas del proyecto dentro de frontend-react
 frontend-react/frontend-react/
@@ -48,6 +56,14 @@ frontend-react/database.db
 frontend-react/run.py
 frontend-react/voz.py
 frontend-react/requirements*.txt
+
+# ── IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
 # ── Editores ─────────────────────────────────────────────
 .vscode/
