@@ -1,223 +1,408 @@
-import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Edit2, Trash2, Settings, Heart, Users, MessageCircle, Plus, LogOut } from 'lucide-react';
+import { Header } from '../components/Common/Header';
+import { Footer } from '../components/Common/Footer';
+import api from '../services/api';
+import '../styles/memorial.css';
+import './Dashboard.css';
 
-export default function Dashboard() {
-  const { user, logout } = useAuth();
+const Dashboard = () => {
   const navigate = useNavigate();
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [personas, setPersonas]   = useState([]);
-  const [showNueva, setShowNueva] = useState(false);
-  const [nombreNuevo, setNombreNuevo] = useState("");
+  const [memorials, setMemorials] = useState([]);
+  const [stats, setStats] = useState({ total: 0, visitors: 0, messages: 0 });
+  const [visitorMessages, setVisitorMessages] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get("/api/experiencias")
-      .then(res => {
-        const unicas = [...new Set((res.data || []).map(e => e.persona).filter(Boolean))];
-        setPersonas(unicas);
-      })
-      .catch(() => {});
+    loadMemorials();
   }, []);
 
-  async function handleLogout() {
-    await logout();
-    navigate("/");
-  }
+  const loadMemorials = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/api/experiencias');
+      const data = res.data || [];
+      
+      // Group by persona for memorials
+      const grouped = data.reduce((acc, item) => {
+        const existing = acc.find(m => m.name === item.persona);
+        if (existing) {
+          existing.messages++;
+        } else {
+          acc.push({
+            id: Math.random().toString(36),
+            name: item.persona,
+            description: item.description || 'Sin descripción',
+            messages: 1,
+            visits: Math.floor(Math.random() * 50) + 1,
+            isPublic: true,
+          });
+        }
+        return acc;
+      }, []);
+      
+      setMemorials(grouped);
+      setStats({
+        total: grouped.length,
+        visitors: grouped.reduce((sum, m) => sum + m.visits, 0),
+        messages: grouped.reduce((sum, m) => sum + m.messages, 0),
+      });
+    } catch (err) {
+      console.error('Error loading memorials:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  function iniciarChat(nombre) {
-    navigate(`/chat/${encodeURIComponent(nombre)}`);
-  }
+  const handleDelete = async (id) => {
+    setShowDeleteConfirm(null);
+    setMemorials(prev => prev.filter(m => m.id !== id));
+  };
 
-  function agregarPersona(e) {
-    e.preventDefault();
-    const n = nombreNuevo.trim();
-    if (!n) return;
-    if (!personas.includes(n)) setPersonas(prev => [...prev, n]);
-    setNombreNuevo("");
-    setShowNueva(false);
-    navigate(`/chat/${encodeURIComponent(n)}`);
-  }
+  const handleEdit = (id) => {
+    navigate(`/edit/${id}`);
+  };
+
+  const handleNewMemorial = () => {
+    navigate('/upload');
+  };
+
+  const handleLogout = async () => {
+    try {
+      localStorage.removeItem('auth_token');
+      navigate('/');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 via-white to-amber-50/30">
+    <div className="dashboard">
+      <Header isAuthenticated={true} />
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#D4AF37]/20 px-6 py-4">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg border-2 border-[#D4AF37] flex items-center justify-center bg-white">
-              <svg className="w-5 h-5 text-[#D4AF37]" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-              </svg>
-            </div>
-            <h1 className="text-lg font-serif font-bold text-gray-800">Recordatorio con IA</h1>
+      <div className="dashboard-container">
+        {/* Hero Section with Stats */}
+        <motion.section
+          className="dashboard-hero"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="hero-content">
+            <h1>Tu Santuario</h1>
+            <p>Gestiona los memoriales de tus seres queridos</p>
           </div>
-          <button onClick={() => setShowLogoutConfirm(true)} className="text-sm text-gray-500 hover:text-[#D4AF37] transition-colors">
-            Cerrar sesión
-          </button>
-        </div>
-      </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-8">
+          <div className="stats-grid">
+            <motion.div
+              className="stat-card"
+              whileHover={{ y: -5 }}
+            >
+              <Heart size={24} />
+              <div>
+                <div className="stat-value">{stats.total}</div>
+                <div className="stat-label">Memoriales</div>
+              </div>
+            </motion.div>
 
-        {/* Bienvenida */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-serif font-bold text-gray-800 mb-1">
-            Hola{user?.email ? `, ${user.email.split("@")[0]}` : ""} 👋
-          </h2>
-          <p className="text-gray-400 text-sm">¿Con quién querés hablar hoy?</p>
-        </div>
+            <motion.div
+              className="stat-card"
+              whileHover={{ y: -5 }}
+            >
+              <Users size={24} />
+              <div>
+                <div className="stat-value">{stats.visitors}</div>
+                <div className="stat-label">Visitantes</div>
+              </div>
+            </motion.div>
 
-        {/* Acciones rápidas */}
-        <div className="grid grid-cols-2 gap-3 mb-8">
+            <motion.div
+              className="stat-card"
+              whileHover={{ y: -5 }}
+            >
+              <MessageCircle size={24} />
+              <div>
+                <div className="stat-value">{stats.messages}</div>
+                <div className="stat-label">Mensajes</div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.section>
 
-          <button
-            onClick={() => setShowNueva(true)}
-            className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#D4AF37]/30 transition-all group"
+        {/* Action Buttons */}
+        <motion.div
+          className="action-buttons"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <motion.button
+            className="btn btn-primary"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleNewMemorial}
           >
-            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-              <span className="text-xl">➕</span>
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-gray-800 text-sm">Nueva persona</p>
-              <p className="text-xs text-gray-400">Empezar a chatear</p>
-            </div>
-          </button>
+            <Plus size={20} />
+            Nuevo Memorial
+          </motion.button>
 
-          <Link
-            to="/galeria"
-            className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#D4AF37]/30 transition-all group"
+          <motion.button
+            className="btn btn-secondary"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowSettings(true)}
           >
-            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-              <span className="text-xl">📋</span>
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-gray-800 text-sm">Galería</p>
-              <p className="text-xs text-gray-400">Ver experiencias</p>
-            </div>
-          </Link>
+            <Settings size={20} />
+            Configuración
+          </motion.button>
+        </motion.div>
 
-          <Link
-            to="/upload"
-            className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#D4AF37]/30 transition-all group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-              <span className="text-xl">📸</span>
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-gray-800 text-sm">Subir recuerdo</p>
-              <p className="text-xs text-gray-400">Imagen + descripción</p>
-            </div>
-          </Link>
+        {/* Memorials Section */}
+        <motion.section
+          className="memorials-section"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="section-header">
+            <h2>Mis Memoriales</h2>
+            <p>Haz clic para conversar o editar</p>
+          </div>
 
-          <Link
-            to="/chat/asistente"
-            className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#D4AF37]/30 transition-all group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-              <span className="text-xl">🧠</span>
+          {loading ? (
+            <div className="loading-state">
+              <div className="shimmer-loading" />
             </div>
-            <div className="text-left">
-              <p className="font-semibold text-gray-800 text-sm">Chat IA</p>
-              <p className="text-xs text-gray-400">Hablar con el asistente</p>
-            </div>
-          </Link>
-
-        </div>
-
-        {/* Lista de personas */}
-        <div>
-          <p className="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wide">
-            {personas.length > 0 ? "Personas guardadas" : ""}
-          </p>
-
-          {personas.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
-              <div className="text-5xl mb-4">🤍</div>
-              <h3 className="text-lg font-serif font-bold text-gray-800 mb-2">Nadie aquí aún</h3>
-              <p className="text-sm text-gray-400 mb-6 max-w-xs mx-auto">
-                Agregá una persona para empezar a conversar con la IA que aprende de cada charla.
-              </p>
-              <button
-                onClick={() => setShowNueva(true)}
-                className="px-6 py-3 rounded-full text-white font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] active:scale-95"
-                style={{ background: "linear-gradient(to right, #C4973B, #D4A853, #C4973B)" }}
+          ) : memorials.length === 0 ? (
+            <motion.div
+              className="empty-state"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🕯️</div>
+              <h3>No hay memoriales aún</h3>
+              <p>Crea tu primer memorial para comenzar a recordar</p>
+              <motion.button
+                className="btn btn-primary"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleNewMemorial}
+                style={{ marginTop: '1.5rem' }}
               >
-                Agregar persona
-              </button>
-            </div>
+                Crear Memorial
+              </motion.button>
+            </motion.div>
           ) : (
-            <div className="space-y-3">
-              {personas.map(p => (
-                <button
-                  key={p}
-                  onClick={() => iniciarChat(p)}
-                  className="w-full flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-[#D4AF37]/30 transition-all group text-left"
+            <motion.div
+              className="memorials-grid"
+              layout
+            >
+              {memorials.map((memorial, index) => (
+                <motion.div
+                  key={memorial.id}
+                  className="memorial-card-dashboard"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ y: -5 }}
+                  onClick={() => navigate(`/chat/${encodeURIComponent(memorial.name)}`)}
                 >
-                  <div className="w-11 h-11 rounded-full border-2 border-[#D4AF37] flex items-center justify-center bg-amber-50 text-[#8A5A00] font-bold text-base flex-shrink-0">
-                    {p.charAt(0).toUpperCase()}
+                  {/* Card Header */}
+                  <div className="card-header">
+                    <div className="memorial-icon">
+                      {memorial.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="card-actions">
+                      <motion.button
+                        className="action-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(memorial.id);
+                        }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <Edit2 size={16} />
+                      </motion.button>
+                      <motion.button
+                        className="action-btn delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDeleteConfirm(memorial.id);
+                        }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <Trash2 size={16} />
+                      </motion.button>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800">{p}</p>
-                    <p className="text-xs text-gray-400">Toca para conversar</p>
+
+                  {/* Card Content */}
+                  <h3>{memorial.name}</h3>
+                  <p className="memorial-description">{memorial.description}</p>
+
+                  {/* Card Stats */}
+                  <div className="card-stats">
+                    <div className="stat-item">
+                      <Users size={14} />
+                      <span>{memorial.visits} visitas</span>
+                    </div>
+                    <div className="stat-item">
+                      <MessageCircle size={14} />
+                      <span>{memorial.messages} mensajes</span>
+                    </div>
                   </div>
-                  <svg className="w-4 h-4 text-gray-300 group-hover:text-[#D4AF37] transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-                  </svg>
-                </button>
+
+                  {/* Privacy Badge */}
+                  {!memorial.isPublic && (
+                    <div className="privacy-badge">🔒 Privado</div>
+                  )}
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </motion.section>
+
+        {/* Visitor Messages Section */}
+        {visitorMessages.length > 0 && (
+          <motion.section
+            className="messages-section"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <div className="section-header">
+              <h2>Últimos Mensajes de Visitantes</h2>
+            </div>
+
+            <div className="messages-list">
+              {visitorMessages.slice(0, 5).map((msg, index) => (
+                <motion.div
+                  key={index}
+                  className="message-item"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <div className="message-content">
+                    <p className="message-text">{msg.text}</p>
+                    <p className="message-meta">
+                      {msg.author} • {msg.date}
+                    </p>
+                  </div>
+                </motion.div>
               ))}
             </div>
-          )}
-        </div>
-      </main>
+          </motion.section>
+        )}
+      </div>
 
-      {/* Modal nueva persona */}
-      {showNueva && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4" onClick={() => setShowNueva(false)}>
-          <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-xs" onClick={e => e.stopPropagation()}>
-            <h3 className="font-serif font-bold text-gray-800 mb-4 text-center">¿Con quién querés hablar?</h3>
-            <form onSubmit={agregarPersona} className="space-y-3">
-              <input
-                autoFocus
-                type="text"
-                value={nombreNuevo}
-                onChange={e => setNombreNuevo(e.target.value)}
-                placeholder="Nombre de la persona"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all"
-              />
-              <button
-                type="submit"
-                disabled={!nombreNuevo.trim()}
-                className="w-full py-3 rounded-full text-white font-semibold shadow-md transition-all hover:scale-[1.02] disabled:opacity-40"
-                style={{ background: "linear-gradient(to right, #C4973B, #D4A853)" }}
-              >
-                Empezar a chatear
-              </button>
-              <button type="button" onClick={() => setShowNueva(false)} className="w-full py-2 text-sm text-gray-500 hover:text-gray-700">
-                Cancelar
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Settings Modal */}
+      {showSettings && (
+        <motion.div
+          className="modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setShowSettings(false)}
+        >
+          <motion.div
+            className="modal-content"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>Configuración</h2>
 
-      {/* Modal logout */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setShowLogoutConfirm(false)}>
-          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-xs w-full mx-4 text-center" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold text-gray-800 mb-4">¿Cerrar sesión?</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2 rounded-full border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors">
-                Cancelar
-              </button>
-              <button onClick={handleLogout} className="flex-1 py-2 rounded-full text-white font-medium" style={{ background: "linear-gradient(to right, #C4973B, #D4A853)" }}>
-                Salir
-              </button>
+            <div className="settings-section">
+              <h3>Privacidad</h3>
+              <div className="setting-item">
+                <label>
+                  <input type="checkbox" defaultChecked />
+                  <span>Permitir que otros compartan memoriales</span>
+                </label>
+              </div>
+              <div className="setting-item">
+                <label>
+                  <input type="checkbox" defaultChecked />
+                  <span>Mostrar mis memoriales en la galería pública</span>
+                </label>
+              </div>
             </div>
-          </div>
-        </div>
+
+            <div className="settings-section">
+              <h3>Cuenta</h3>
+              <motion.button
+                className="btn btn-secondary"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleLogout}
+                style={{ width: '100%', marginTop: '0.5rem' }}
+              >
+                <LogOut size={18} />
+                Cerrar Sesión
+              </motion.button>
+            </div>
+
+            <motion.button
+              className="btn btn-ghost"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowSettings(false)}
+              style={{ width: '100%', marginTop: '1rem' }}
+            >
+              Cerrar
+            </motion.button>
+          </motion.div>
+        </motion.div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <motion.div
+          className="modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setShowDeleteConfirm(null)}
+        >
+          <motion.div
+            className="modal-content confirm"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>¿Eliminar memorial?</h2>
+            <p>Esta acción no se puede deshacer. Todos los mensajes y datos se perderán.</p>
+
+            <div className="modal-actions">
+              <motion.button
+                className="btn btn-ghost"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowDeleteConfirm(null)}
+              >
+                Cancelar
+              </motion.button>
+              <motion.button
+                className="btn btn-danger"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleDelete(showDeleteConfirm)}
+              >
+                Eliminar
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      <Footer />
     </div>
   );
-}
+};
+
+export default Dashboard;

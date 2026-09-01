@@ -1,10 +1,11 @@
 """Rutas principales de la aplicación"""
 
 from flask import Blueprint, render_template, request, redirect, current_app, jsonify
+from openai import OpenAI
 import uuid
 import os
 from dotenv import load_dotenv
-from app.services.vision_service import describir_imagen
+from app.services.vision_service import describir_imagen  # noqa: F401 (mantenido por compatibilidad)
 
 from app.auth import login_required
 from app.services.emotion_service import detectar_emocion
@@ -20,25 +21,96 @@ from app.services.validation import (
     validar_archivo_imagen, validar_form_upload, validar_mensaje_chat
 )
 from app.services.upload_service import guardar_imagen, generar_qr
+from app.services.experience_analysis_service import analizar_y_guardar_experiencia
 from app.ia_service import generar_embedding
 from app.voz_service import generar_audio
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=False)
 
-# 🔥 MODELO CENTRALIZADO
+# 🔥 MODELO CENTRALIZADO (Groq; la IA propia local es la principal — esto es solo respaldo)
 DEFAULT_MODEL = "llama-3.1-8b-instant"
 MODEL_NAME = os.getenv("MODEL_NAME", DEFAULT_MODEL)
 MODEL_FALLBACKS = [
     os.getenv("MODEL_NAME", DEFAULT_MODEL),
     "llama-3.1-8b-instant",
-    "llama-3.3-70b-versatile",
+    "openai/gpt-oss-120b",
 ]
 
 main = Blueprint('main', __name__)
 
 
-def obtener_respuesta_ia(client, mensaje, modelo_inicial=None):
-    """Intenta responder con un modelo principal y hace fallback a modelos compatibles."""
+def _limpiar_archivos_huerfanos(filename, qr_name):
+    """Elimina la imagen y el QR subidos si la experiencia no se guardó."""
+    for carpeta, nombre in (("static/uploads", filename), ("static/qr", qr_name)):
+        if not nombre:
+            continue
+        ruta = os.path.join(carpeta, nombre)
+        try:
+            if os.path.exists(ruta):
+                os.remove(ruta)
+        except OSError as e:
+            print(f"⚠️ No se pudo eliminar archivo huérfano {ruta}: {e}")
+
+
+def responder_con_ia(client, prompt, respuesta_por_defecto="No pude responder.", propagar_error=False):
+    """Obtiene respuesta de la IA con logging de errores.
+
+    Returns:
+        str: La respuesta de la IA, o el valor por defecto si falló.
+
+    Raises:
+        Exception: Solo si propagar_error es True.
+    """
+    try:
+        respuesta, _ = obtener_respuesta_ia(client, prompt, modelo_inicial=MODEL_NAME)
+        return respuesta
+    except Exception as e:
+        print(f"❌ Error IA: {e}")
+        if propagar_error:
+            raise
+        return respuesta_por_defecto
+
+
+def generar_audio_seguro(respuesta, emocion, persona=None):
+    """Genera audio de la respuesta, devolviendo None si falla.
+
+    La voz se modula según la afinidad acumulada con la persona (evolución
+    de la IA propia); si no se puede leer, usa la voz base sin alterar.
+    """
+    afinidad = None
+    if persona:
+        try:
+            from app.ia_core.evolucion import cargar_estado
+            afinidad = cargar_estado(persona).afinidad
+        except Exception as e:
+            print(f"⚠️ Voz: sin afinidad para {persona}: {e}")
+    try:
+        return generar_audio(respuesta, emocion=emocion, afinidad=afinidad)
+    except Exception as e:
+        print(f"⚠️ Error audio: {e}")
+        return None
+
+
+def obtener_respuesta_ia(client: "OpenAI", mensaje: str, modelo_inicial: str | None = None) -> tuple[str, str]:
+    """Intenta responder con un modelo principal y hace fallback a modelos compatibles.
+
+    Args:
+        client: Cliente de OpenAI/Groq ya inicializado (openai.OpenAI).
+        mensaje: Texto del mensaje del usuario a enviar al modelo.
+        modelo_inicial: Modelo preferido; si es None se usan solo los
+            fallbacks de MODEL_FALLBACKS.
+
+    Returns:
+        tuple[str, str]: (respuesta_texto, nombre_del_modelo_usado).
+
+    Raises:
+        Exception: Los errores de modelo no encontrado (404 / "model_not_found")
+            son absorbidos y disparan el fallback al siguiente modelo. Cualquier
+            otro error (rate limit, autenticación, red, etc.) se propaga
+            inmediatamente al llamador. Si todos los modelos fallan con error
+            de modelo no encontrado, se relanza el último error; si la lista de
+            modelos queda vacía, se lanza RuntimeError.
+    """
     modelos = []
     if modelo_inicial:
         modelos.append(modelo_inicial)
@@ -81,7 +153,8 @@ def obtener_respuesta_ia(client, mensaje, modelo_inicial=None):
 def debug():
     return {
         "supabase": hasattr(current_app, "supabase"),
-        "openai": hasattr(current_app, "openai_client")
+        "openai": hasattr(current_app, "openai_client"),
+        "ia_propia": True
     }
 
 # =========================
@@ -132,6 +205,8 @@ def upload(current_user=None):
     if not valido:
         return render_template("upload.html", error=error), 400
 
+    filename = None
+    qr_name = None
     try:
         uid = str(uuid.uuid4())
         filename = guardar_imagen(file)
@@ -148,38 +223,14 @@ def upload(current_user=None):
             "qr": qr_name
         }).execute()
 
-        # ===============================
-        # Análisis de imagen usando visión IA
-        # ===============================
-        descripcion_ia = None
-        try:
-            descripcion_ia = describir_imagen(filename)  # Ruta o URL accesible
-            current_app.supabase.table("experiences").update({
-                "ai_description": descripcion_ia
-            }).eq("id", uid).execute()
-
-            emb = generar_embedding(descripcion_ia)
-            guardar_memoria(persona, descripcion_ia, emb, tipo='experiencia')
-
-        except Exception as e:
-            print(f"⚠️ Error en análisis de imagen: {e}")
-
-        # También guardar la memoria del texto base (title + desc)
-        try:
-            texto = f"{persona} | {title} | {description}"
-            emb = generar_embedding(texto)
-            guardar_memoria(persona, texto, emb, tipo='experiencia')
-
-            perfil_inicial = construir_perfil_inicial(persona, descripcion_ia, title, description)
-            emb_perfil = generar_embedding(perfil_inicial)
-            guardar_memoria(persona, perfil_inicial, emb_perfil, tipo='experiencia')
-        except Exception as e:
-            print(f"⚠️ Error embedding texto experiencia: {e}")
+        # Análisis de imagen y guardado de memorias (servicio dedicado)
+        analizar_y_guardar_experiencia(persona, title, description, filename, uid)
 
         return redirect("/")
 
     except Exception as e:
         print(f"❌ Error upload: {e}")
+        _limpiar_archivos_huerfanos(filename, qr_name)
         return render_template("upload.html", error="Error al subir experiencia"), 500
 
 # =========================
@@ -236,11 +287,7 @@ def chat(current_user=None):
     if not valido:
         return render_template("chat.html", error=error), 400
 
-    try:
-        respuesta, _ = obtener_respuesta_ia(current_app.openai_client, mensaje, modelo_inicial=MODEL_NAME)
-    except Exception as e:
-        print(f"❌ Error IA: {e}")
-        respuesta = "Error al consultar IA"
+    respuesta = responder_con_ia(current_app.openai_client, mensaje, respuesta_por_defecto="Error al consultar IA")
 
     return render_template("chat.html", mensaje=mensaje, respuesta=respuesta)
 
@@ -284,13 +331,7 @@ def chat_persona(nombre, current_user=None):
         emocion,
     )
 
-    respuesta = "No pude responder."
-    audio_path = None
-
-    try:
-        respuesta, _ = obtener_respuesta_ia(current_app.openai_client, prompt, modelo_inicial=MODEL_NAME)
-    except Exception as e:
-        print(f"❌ Error IA persona: {e}")
+    respuesta = responder_con_ia(current_app.openai_client, prompt)
 
     try:
         memoria_texto = f"U:{msg} | R:{respuesta}"
@@ -299,15 +340,23 @@ def chat_persona(nombre, current_user=None):
     except Exception as e:
         print(f"⚠️ Error memoria: {e}")
 
-    try:
-        audio_path = generar_audio(respuesta, emocion=emocion)
-    except Exception as e:
-        print(f"⚠️ Error audio: {e}")
+    audio_path = generar_audio_seguro(respuesta, emocion, persona=nombre)
 
+    # Usa la imagen de la experiencia almacenada para esta persona, si existe
     avatar = construir_url_avatar(None)
     try:
-        avatar = construir_url_avatar(filename)
-    except Exception:
+        if hasattr(current_app, "supabase"):
+            res_exp = current_app.supabase \
+                .table("experiences") \
+                .select("image") \
+                .eq("persona", nombre) \
+                .order("created_at", desc=True) \
+                .limit(1) \
+                .execute()
+            if res_exp.data and res_exp.data[0].get("image"):
+                avatar = construir_url_avatar(res_exp.data[0]["image"])
+    except Exception as e:
+        print(f"⚠️ Error obteniendo avatar de experiencia: {e}")
         avatar = construir_url_avatar(None)
 
     return render_template(
@@ -350,14 +399,10 @@ def internal_error(error):
     return render_template("error.html", message="Error interno del servidor"), 500
 
 # =========================
-# API CHAT PERSONA (JSON)
+# API CHAT PERSONA (JSON) — motor de IA propio
 @main.route("/api/chat/<nombre>", methods=["POST"])
 @login_required
 def api_chat_persona(nombre, current_user=None):
-
-    if not current_app.openai_client:
-        return jsonify({"error": "IA no configurada"}), 503
-
     data = request.get_json(silent=True) or {}
     msg = (data.get("message") or "").strip()
     historial = data.get("historial") or []
@@ -366,25 +411,67 @@ def api_chat_persona(nombre, current_user=None):
     if not valido:
         return jsonify({"error": error}), 400
 
-    emocion = detectar_emocion(msg)
-
-    respuesta = "No pude responder."
-    audio_path = None
-
+    # Recupera memorias semánticas para dar contexto vivo al motor propio
+    memorias = []
+    perfil = f"{nombre} es una persona interesante y expresiva"
     try:
-        respuesta, _ = obtener_respuesta_ia(current_app.openai_client, msg, modelo_inicial=MODEL_NAME)
+        from app.ia_service import generar_embedding
+        from app.services.memory_service import obtener_memorias_personaje
+        emb = generar_embedding(msg)
+        if hasattr(emb, "tolist"):
+            emb = emb.tolist()
+        memorias = obtener_memorias_personaje(nombre, emb)
     except Exception as e:
-        print(f"❌ Error IA: {e}")
-        return jsonify({"error": str(e)}), 500
+        print(f"⚠️ Memorias: {e}")
 
+    # Motor de IA propio (empático, evolutivo, local). Groq solo como respaldo.
+    from app.services.ia_propia_service import responder_con_respaldo
+    resultado, motor_usado = responder_con_respaldo(
+        nombre, msg, historial=historial, memorias=memorias, perfil=perfil
+    )
+
+    if not resultado or not resultado.get("respuesta"):
+        return jsonify({"error": "IA no disponible en este momento"}), 503
+
+    respuesta = resultado["respuesta"]
+    emocion = resultado.get("emocion") or detectar_emocion(msg)
+
+    # Guarda la conversación como memoria para futuras respuestas
     try:
-        audio_path = generar_audio(respuesta, emocion=emocion)
+        from app.ia_service import generar_embedding
+        from app.services.memory_service import guardar_memoria
+        memoria_texto = f"U:{msg} | R:{respuesta}"
+        emb_respuesta = generar_embedding(memoria_texto)
+        guardar_memoria(nombre, memoria_texto, emb_respuesta, tipo='conversacion')
     except Exception as e:
-        print(f"⚠️ Error audio API: {e}")
+        print(f"⚠️ Error memoria: {e}")
+
+    audio_path = generar_audio_seguro(respuesta, emocion, persona=nombre)
 
     return jsonify({
         "respuesta": respuesta,
         "emocion": emocion,
         "audio": f"/static/audio/{audio_path}" if audio_path else None,
         "avatar_state": obtener_estado_avatar(emocion),
+        "motor": motor_usado,
+        "nivel_ia": resultado.get("nivel"),
+        "nombre_nivel": resultado.get("nombre_nivel"),
+    })
+
+# =========================
+# ESTADO DE EVOLUCIÓN DE LA IA PROPIA
+@main.route("/api/ia/estado/<nombre>")
+@login_required
+def api_ia_estado(nombre, current_user=None):
+    """Devuelve cómo ha evolucionado la IA con esta persona."""
+    from app.ia_core.evolucion import cargar_estado
+    from app.services.ia_propia_service import _cargar_estilo
+
+    estado = cargar_estado(nombre)
+    estilo = _cargar_estilo(nombre)
+
+    return jsonify({
+        "persona": nombre,
+        "evolucion": estado.to_dict(),
+        "estilo": estilo,
     })

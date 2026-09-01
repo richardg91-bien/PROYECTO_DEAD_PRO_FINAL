@@ -20,7 +20,8 @@ const ChatPersona = () => {
   const [error, setError] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [personaData, setPersonaData] = useState(null);
-  
+  const [nivelIA, setNivelIA] = useState({ nivel: 1, nombre: 'Aprendiz' });
+
   const audioRef = useRef(null);
   const bottomRef = useRef(null);
   const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
@@ -29,6 +30,16 @@ const ChatPersona = () => {
     // Scroll to bottom when new messages arrive
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [historial, cargando]);
+
+  useEffect(() => {
+    // Carga el estado de evolución de la IA propia con esta persona
+    api.get(`/api/ia/estado/${encodeURIComponent(nombre)}`)
+      .then((res) => {
+        const ev = res.data?.evolucion;
+        if (ev) setNivelIA({ nivel: ev.nivel, nombre: ev.nombre_nivel, afinidad: ev.afinidad });
+      })
+      .catch(() => {});
+  }, [nombre]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -47,8 +58,9 @@ const ChatPersona = () => {
         historial: nuevoHistorial,
       });
 
-      const { respuesta, emocion: em, audio } = res.data;
+      const { respuesta, emocion: em, audio, nivel_ia, nombre_nivel } = res.data;
       setEmocion(em || 'neutral');
+      if (nivel_ia) setNivelIA((prev) => ({ ...prev, nivel: nivel_ia, nombre: nombre_nivel || prev.nombre }));
       setHistorial((prev) => [
         ...prev,
         { rol: 'ia', texto: respuesta, emotion: em, audio, timestamp: new Date() },
@@ -98,6 +110,10 @@ const ChatPersona = () => {
             <div className="bio-item">
               <span className="bio-label">Estado</span>
               <span className="bio-value capitalize">{emocion}</span>
+            </div>
+            <div className="bio-item">
+              <span className="bio-label">Vínculo IA</span>
+              <span className="bio-value">Nivel {nivelIA.nivel} · {nivelIA.nombre}</span>
             </div>
             <div className="bio-item">
               <span className="bio-label">Mensajes</span>
