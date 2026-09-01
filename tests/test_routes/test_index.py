@@ -41,10 +41,14 @@ def test_health_route(client):
 
 
 def test_production_requires_secret_key(monkeypatch):
+    """Valida que en modo producción se requiera SECRET_KEY."""
     monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
     monkeypatch.setenv("SUPABASE_KEY", "test-key")
-    monkeypatch.delenv("SECRET_KEY", raising=False)
     monkeypatch.setenv("FLASK_ENV", "production")
+    # Eliminar SECRET_KEY del entorno actual
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    # También parchear dotenv_values para que retorne un dict sin SECRET_KEY
+    monkeypatch.setattr("app.dotenv_values", lambda *args, **kwargs: {})
 
     with pytest.raises(ValueError, match="SECRET_KEY"):
         create_app()
