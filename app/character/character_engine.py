@@ -1,5 +1,7 @@
 """Motor canónico de conversación de una PERSONA."""
 
+from flask import current_app
+
 from app.character.identity import get_persona_by_id
 from app.character.personality import obtener_personalidad, normalizar_personalidad
 from app.services.persona_memory_service import obtener_memorias_persona
@@ -8,7 +10,7 @@ from app.ia_service import generar_embedding
 
 
 def construir_contexto(persona_id, mensaje, historial=None):
-    persona = get_persona_by_id(__import__('flask').current_app, persona_id)
+    persona = get_persona_by_id(current_app, persona_id)
     if not persona:
         return None
 
@@ -18,9 +20,9 @@ def construir_contexto(persona_id, mensaje, historial=None):
         emb = generar_embedding(mensaje)
         if hasattr(emb, "tolist"):
             emb = emb.tolist()
-        recuerdos = obtener_memorias_persona(persona_id, emb, threshold=0.30, limit=6)
+        recuerdos = obtener_memorias_persona(persona_id, emb, threshold=0.30, limit=8)
     except Exception as exc:
-        print(f"⚠️ Error recuperando memorias de persona: {exc}")
+        current_app.logger.warning("No se pudieron recuperar memorias: %s", exc)
 
     return {
         "persona": persona,
@@ -32,8 +34,6 @@ def construir_contexto(persona_id, mensaje, historial=None):
 
 
 def generar_respuesta(persona_id, mensaje, historial=None):
-    from flask import current_app
-
     contexto = construir_contexto(persona_id, mensaje, historial)
     if not contexto:
         return None
@@ -44,7 +44,8 @@ def generar_respuesta(persona_id, mensaje, historial=None):
     emocion = contexto["emocion_visitante"]
 
     recuerdos_texto = "\n".join(
-        f"- {item.get('contenido', '')}" for item in recuerdos if item.get("contenido")
+        f"- {item.get('contenido', '')} (tipo: {item.get('tipo', 'otro')}, importancia: {item.get('importancia', 3)}/5)"
+        for item in recuerdos if item.get("contenido")
     ) or "- No hay recuerdos relevantes registrados."
 
     system_prompt = f"""Sos la representación conversacional de {persona.get('nombre', 'esta persona')}.
@@ -56,10 +57,10 @@ Fallecimiento: {persona.get('fecha_fallecimiento') or 'desconocido'}
 Lugar de nacimiento: {persona.get('lugar_nacimiento') or 'desconocido'}
 Lugar de fallecimiento: {persona.get('lugar_fallecimiento') or 'desconocido'}
 
-PERSONALIDAD:
+PERSONALIDAD ESTRUCTURADA:
 {personalidad}
 
-RECUERDOS RELEVANTES:
+MEMORIAS RELEVANTES DE ESTA PERSONA:
 {recuerdos_texto}
 
 EMOCIÓN DETECTADA DEL VISITANTE: {emocion}
@@ -67,6 +68,7 @@ EMOCIÓN DETECTADA DEL VISITANTE: {emocion}
 REGLAS:
 - Respondé en español natural y humano.
 - Mantené coherencia con la identidad y personalidad registrada.
+- Usá los recuerdos como contexto, priorizando los de mayor relevancia e importancia.
 - No inventes hechos biográficos como si fueran recuerdos reales.
 - Si no existe información suficiente, reconocé la incertidumbre de forma natural.
 - No afirmes que una persona fallecida realmente está viva ni que la IA es literalmente la persona.
@@ -90,4 +92,5 @@ REGLAS:
         "respuesta": response.choices[0].message.content.strip(),
         "emocion": emocion,
         "persona": persona,
+        "memorias_utilizadas": len(recuerdos),
     }
