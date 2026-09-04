@@ -6,6 +6,7 @@ Estas rutas son nuevas y no sustituyen las rutas legacy existentes.
 import uuid
 from flask import Blueprint, current_app, jsonify, request
 
+from app.auth import login_required
 from app.character.identity import get_persona_by_id, get_persona_by_slug
 
 persona_bp = Blueprint("persona", __name__, url_prefix="/api/personas")
@@ -50,30 +51,21 @@ def api_persona_slug(slug):
 
 
 @persona_bp.post("")
-def api_persona_create():
-    """Crea una PERSONA cuando el backend recibe un usuario autenticado.
-
-    La autorización definitiva se mantiene en Supabase RLS. Esta primera etapa
-    solamente valida los campos y evita crear personas sin owner_id.
-    """
+@login_required
+def api_persona_create(current_user=None):
+    """Crea una PERSONA asociada al usuario autenticado."""
     data = request.get_json(silent=True) or {}
-    owner_id = data.get("owner_id")
     nombre = (data.get("nombre") or "").strip()
     slug = (data.get("slug") or "").strip().lower()
 
-    if not owner_id or not nombre or not slug:
-        return jsonify({"error": "owner_id, nombre y slug son obligatorios"}), 400
-
-    try:
-        uuid.UUID(str(owner_id))
-    except (ValueError, AttributeError):
-        return jsonify({"error": "owner_id inválido"}), 400
+    if not nombre or not slug:
+        return jsonify({"error": "nombre y slug son obligatorios"}), 400
 
     if len(nombre) > 200 or len(slug) > 120:
         return jsonify({"error": "nombre o slug demasiado largo"}), 400
 
     payload = {
-        "owner_id": str(owner_id),
+        "owner_id": str(current_user.id),
         "nombre": nombre,
         "slug": slug,
         "bio": data.get("bio"),
