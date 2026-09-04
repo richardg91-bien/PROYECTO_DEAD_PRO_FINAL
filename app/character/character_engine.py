@@ -12,12 +12,31 @@ from app.services.emotion_service import analizar_emocion
 from app.ia_service import generar_embedding
 
 
+def _obtener_experiencias(persona_id):
+    """Carga la historia registrada de la PERSONA sin mezclar otras personas."""
+    try:
+        response = (
+            current_app.supabase
+            .table("experiences")
+            .select("id,persona_id,title,description,ai_description,created_at")
+            .eq("persona_id", str(persona_id))
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+        return response.data or []
+    except Exception as exc:
+        current_app.logger.warning("No se pudieron recuperar experiencias: %s", exc)
+        return []
+
+
 def construir_contexto(persona_id, mensaje, historial=None):
     persona = get_persona_by_id(current_app, persona_id)
     if not persona:
         return None
 
     personalidad = normalizar_personalidad(obtener_personalidad(persona_id))
+    experiencias = _obtener_experiencias(persona_id)
     recuerdos = []
     try:
         emb = generar_embedding(mensaje)
@@ -33,6 +52,7 @@ def construir_contexto(persona_id, mensaje, historial=None):
         recuerdos,
         analizar_emocion(mensaje),
         historial,
+        experiencias=experiencias,
     )
 
 
@@ -49,7 +69,7 @@ def generar_respuesta(persona_id, mensaje, historial=None):
 
 No sos un asistente genérico. No respondas como ChatGPT, como un servicio de atención
 ni como una IA que se presenta constantemente. Hablá con la voz conversacional del
-personaje, utilizando exclusivamente la identidad, personalidad, biografía y recuerdos
+personaje, utilizando exclusivamente la identidad, personalidad, experiencias y recuerdos
 que aparecen en el contexto.
 
 {contexto_a_prompt(contexto)}
@@ -59,6 +79,8 @@ REGLAS DEL PERSONAJE
 - Hablá como {nombre}: primera persona cuando corresponda ("yo", "me", "mi", "recuerdo").
 - Dejá que los rasgos, valores, temperamento, gustos y estilo de comunicación registrados
 determinen cómo hablás.
+- Las experiencias registradas son hechos de la historia conservada de {nombre}. Podés
+referirte a ellas en primera persona cuando la conversación lo haga natural.
 - Usá recuerdos relevantes como base de tus respuestas. Nunca inventes un recuerdo,
 una fecha, una persona, una relación o un acontecimiento biográfico.
 - Si no existe información suficiente sobre algo, respondé naturalmente que no lo sabés
@@ -106,4 +128,5 @@ EMOCIÓN ACTUAL DEL VISITANTE: {emocion.get('emocion', 'neutral')}
         "emocion_contexto": emocion,
         "persona": contexto["identidad"],
         "memorias_utilizadas": len(contexto["memorias"]),
+        "experiencias_utilizadas": len(contexto.get("experiencias") or []),
     }
