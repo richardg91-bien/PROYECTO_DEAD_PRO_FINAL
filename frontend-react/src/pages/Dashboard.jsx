@@ -13,17 +13,8 @@ export default function Dashboard() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.get("/api/experiencias")
-      .then(res => {
-        const rows = res.data || [];
-        const mapped = rows.filter(e => e.persona_id).reduce((acc, e) => {
-          if (!acc.some(p => p.id === e.persona_id)) {
-            acc.push({ id: e.persona_id, nombre: e.persona || "Persona" });
-          }
-          return acc;
-        }, []);
-        setPersonas(mapped);
-      })
+    api.get("/api/personas")
+      .then(res => setPersonas(res.data || []))
       .catch(() => setError("No se pudieron cargar las personas."));
   }, []);
 
@@ -47,7 +38,7 @@ export default function Dashboard() {
         .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const res = await api.post("/api/personas", { nombre: n, slug });
       const persona = res.data;
-      setPersonas(prev => [...prev, persona]);
+      setPersonas(prev => [persona, ...prev]);
       setNombreNuevo("");
       setShowNueva(false);
       navigate(`/p/${persona.id}`);
