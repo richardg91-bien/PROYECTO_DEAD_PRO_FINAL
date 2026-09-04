@@ -5,7 +5,9 @@ sin romper la conversación. La emoción del visitante solo ajusta la prosodia.
 """
 
 import os
+import shutil
 import subprocess
+import sys
 import uuid
 from pathlib import Path
 
@@ -26,6 +28,26 @@ def _config():
     binary = os.getenv("PIPER_BINARY", "piper").strip()
     model = os.getenv("PIPER_MODEL", "").strip()
     return binary, model
+
+
+def _resolver_piper(binary):
+    """Resuelve Piper de forma fiable dentro del .venv, especialmente en Windows."""
+    candidate = Path(binary)
+    if candidate.is_file():
+        return str(candidate)
+
+    resolved = shutil.which(binary)
+    if resolved:
+        return resolved
+
+    if os.name == "nt":
+        scripts_dir = Path(sys.executable).resolve().parent
+        for name in ("piper.exe", "piper"):
+            candidate = scripts_dir / name
+            if candidate.is_file():
+                return str(candidate)
+
+    return binary
 
 
 def _audio_dir():
@@ -49,6 +71,7 @@ def sintetizar_voz(texto, emocion="neutral"):
         current_app.logger.info("Piper no configurado: PIPER_MODEL está vacío")
         return None
 
+    binary = _resolver_piper(binary)
     prosodia = PROSODIA.get(str(emocion or "neutral").lower(), PROSODIA["neutral"])
     filename = f"persona_{uuid.uuid4().hex}.wav"
     output_path = _audio_dir() / filename
