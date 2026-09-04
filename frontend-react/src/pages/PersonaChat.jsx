@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../services/api";
 
-const EMOJIS = { triste: "😢", feliz: "😊", enojado: "😠", neutral: "😌", amor: "❤️", miedo: "😟" };
+const EMOJIS = { triste: "😢", feliz: "😊", enojado: "😠", amor: "❤️", miedo: "😨", neutral: "😌" };
 
 function getSessionId(personaId) {
   const key = `vision1_session_${personaId}`;
@@ -21,6 +21,7 @@ export default function PersonaChat() {
   const [historial, setHistorial] = useState([]);
   const [input, setInput] = useState("");
   const [emocion, setEmocion] = useState("neutral");
+  const [audioUrl, setAudioUrl] = useState("");
   const [cargando, setCargando] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
@@ -56,27 +57,13 @@ export default function PersonaChat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [historial, enviando]);
 
-  async function generarAudio(conversationId) {
-    if (!conversationId || !sessionId.current) return null;
-    try {
-      const res = await api.post(`/api/personas/${personaId}/voice`, {
-        conversation_id: conversationId,
-        session_id: sessionId.current,
-      });
-      if (!res.data?.available || !res.data?.audio) return null;
-      return res.data.audio.startsWith("http") ? res.data.audio : `${baseUrl}${res.data.audio}`;
-    } catch {
-      // La voz es opcional: un fallo de Piper nunca debe romper el chat.
-      return null;
-    }
-  }
-
   async function enviar(e) {
     e.preventDefault();
     const message = input.trim();
     if (!message || enviando) return;
     setInput("");
     setError("");
+    setAudioUrl("");
     const anterior = historial;
     setHistorial([...anterior, { role: "user", content: message }]);
     setEnviando(true);
@@ -90,18 +77,9 @@ export default function PersonaChat() {
       conversationId.current = res.data.conversation_id;
       setEmocion(res.data.emocion || "neutral");
       setPersona((prev) => prev || res.data.persona);
-
-      const respuesta = { role: "assistant", content: res.data.respuesta, audio: null };
-      setHistorial((prev) => [...prev, respuesta]);
-
-      const audio = await generarAudio(res.data.conversation_id);
-      if (audio) {
-        setHistorial((prev) => {
-          const copia = [...prev];
-          const ultimo = copia.length - 1;
-          if (ultimo >= 0 && copia[ultimo].role === "assistant") copia[ultimo] = { ...copia[ultimo], audio };
-          return copia;
-        });
+      setHistorial((prev) => [...prev, { role: "assistant", content: res.data.respuesta }]);
+      if (res.data.audio_url) {
+        setAudioUrl(`${baseUrl}${res.data.audio_url}`);
       }
     } catch (err) {
       setError(err?.response?.data?.error || "No se pudo conectar con el memorial");
@@ -120,7 +98,7 @@ export default function PersonaChat() {
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <Link to="/" className="text-gray-400 hover:text-amber-600 text-xl">←</Link>
           {persona.foto_principal ? <img src={persona.foto_principal} alt={persona.nombre} className="w-11 h-11 rounded-full object-cover border-2 border-amber-400" /> : <div className="w-11 h-11 rounded-full border-2 border-amber-400 flex items-center justify-center bg-amber-50 text-amber-800 font-bold">{persona.nombre?.charAt(0)}</div>}
-          <div className="min-w-0 flex-1"><h1 className="font-serif font-bold text-gray-800 truncate">{persona.nombre}</h1><p className="text-xs text-gray-500">Memorial digital · {EMOJIS[emocion] || "😌"} {emocion}</p></div>
+          <div className="min-w-0 flex-1"><h1 className="font-serif font-bold text-gray-800 truncate">{persona.nombre}</h1><p className="text-xs text-gray-500">Memorial digital · {EMOJIS[emocion] || EMOJIS.neutral} {emocion}</p></div>
         </div>
       </header>
 
@@ -128,7 +106,8 @@ export default function PersonaChat() {
         <div className="max-w-2xl mx-auto space-y-5">
           {historial.length === 0 && <section className="text-center py-8"><div className="text-5xl mb-4">🕊️</div><h2 className="font-serif text-2xl font-bold text-gray-800 mb-2">{persona.nombre}</h2>{persona.bio && <p className="text-gray-500 max-w-lg mx-auto mb-5">{persona.bio}</p>}<p className="text-sm text-gray-400">Podés iniciar una conversación con este memorial.</p></section>}
           {experiencias.length > 0 && historial.length === 0 && <section><h3 className="font-serif font-bold text-gray-700 mb-3">Recuerdos</h3><div className="grid gap-3 sm:grid-cols-2">{experiencias.map((item) => <article key={item.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">{item.image && <img src={`${baseUrl}/static/uploads/${item.image}`} alt={item.title || "Recuerdo"} className="w-full h-40 object-cover" />}<div className="p-4"><h4 className="font-serif font-bold text-gray-800">{item.title || "Recuerdo"}</h4>{item.description && <p className="text-sm text-gray-500 mt-1">{item.description}</p>}</div></article>)}</div></section>}
-          {historial.map((m, i) => <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${m.role === "user" ? "bg-amber-600 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm"}`}><div>{m.content}</div>{m.role === "assistant" && m.audio && <audio className="mt-2 w-full" controls preload="none" src={m.audio} aria-label="Escuchar respuesta del memorial" />}</div></div>)}
+          {historial.map((m, i) => <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${m.role === "user" ? "bg-amber-600 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm"}`}>{m.content}</div></div>)}
+          {audioUrl && <div className="flex justify-start"><div className="bg-white border border-amber-100 rounded-2xl px-3 py-2 shadow-sm"><div className="text-xs text-gray-400 mb-1">Voz de {persona.nombre}</div><audio key={audioUrl} src={audioUrl} controls preload="none" className="w-full max-w-sm" /></div></div>}
           {enviando && <div className="text-gray-400 text-sm">El memorial está preparando una respuesta…</div>}
           {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{error}</div>}
           <div ref={bottomRef} />
