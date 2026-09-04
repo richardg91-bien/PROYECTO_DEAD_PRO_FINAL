@@ -22,9 +22,6 @@ def crear_conversacion(persona_id, session_id, visitor_id=None, metadata=None):
         payload["visitor_id"] = str(visitor_id)
 
     try:
-        # No necesitamos que PostgREST devuelva la fila. Con RLS no existe una
-        # SELECT pública de conversations; pedir RETURNING representation haría
-        # que un INSERT válido fallara al intentar devolver la fila.
         response = current_app.supabase.table("conversations").insert(
             payload, returning="minimal"
         ).execute()
@@ -71,9 +68,22 @@ def guardar_mensaje(conversation_id, role, content, emotion=None, metadata=None)
     }
 
     try:
-        # Igual que conversations: la persistencia pública no necesita un
-        # RETURNING de la fila, porque las lecturas pasan por RPC protegidas.
-        response = current_app.supabase.table("conversation_messages").insert(
+        # Los mensajes del visitante pasan por el cliente público y RLS.
+        # Las respuestas generadas por Character Engine se escriben con el
+        # cliente server-only, que usa SUPABASE_SERVICE_ROLE_KEY y nunca llega
+        # al navegador. Así mantenemos RLS para el tráfico público sin permitir
+        # que un visitante fabrique mensajes con role=persona.
+        client = current_app.supabase
+        if role in {"persona", "system"}:
+            client = getattr(current_app, "supabase_admin", None)
+            if client is None:
+                current_app.logger.error(
+                    "No se puede persistir role=%s: falta SUPABASE_SERVICE_ROLE_KEY",
+                    role,
+                )
+                return None
+
+        response = client.table("conversation_messages").insert(
             payload, returning="minimal"
         ).execute()
         if response is None:
