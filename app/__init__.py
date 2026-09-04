@@ -75,4 +75,8 @@ def create_app():
     from app.auth_routes import auth_bp
     app.register_blueprint(auth_bp)
 
+    # Visión 1: API person-centric nueva. Las rutas legacy siguen activas.
+    from app.persona_routes import persona_bp
+    app.register_blueprint(persona_bp)
+
     return app
