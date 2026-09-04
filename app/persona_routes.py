@@ -7,6 +7,7 @@ from app.auth import login_required
 from app.character.identity import get_persona_by_id, get_persona_by_slug
 from app.character.character_engine import generar_respuesta
 from app.character.conversation import crear_conversacion, obtener_conversacion, guardar_mensaje, obtener_mensajes
+from app.services.upload_service import generar_qr
 
 persona_bp = Blueprint("persona", __name__, url_prefix="/api/personas")
 
@@ -25,13 +26,22 @@ def _session_id(value):
     return value
 
 
+def _persona_owned(persona_id, current_user):
+    response = (current_app.supabase.table("personas")
+        .select("id,nombre,slug,owner_id,qr")
+        .eq("id", persona_id)
+        .eq("owner_id", str(current_user.id))
+        .limit(1).execute())
+    return response.data[0] if response.data else None
+
+
 @persona_bp.get("")
 @login_required
 def api_personas(current_user=None):
     """Lista las personas del propietario autenticado."""
     try:
         response = (current_app.supabase.table("personas")
-            .select("id,owner_id,nombre,slug,bio,fecha_nacimiento,fecha_fallecimiento,lugar_nacimiento,lugar_fallecimiento,foto_principal,visibilidad,created_at,updated_at")
+            .select("id,owner_id,nombre,slug,bio,fecha_nacimiento,fecha_fallecimiento,lugar_nacimiento,lugar_fallecimiento,foto_principal,visibilidad,qr,created_at,updated_at")
             .eq("owner_id", str(current_user.id))
             .order("created_at", desc=True).execute())
         return jsonify(response.data or [])
@@ -107,12 +117,43 @@ def api_persona_create(current_user=None):
     }
     try:
         response = current_app.supabase.table("personas").insert(payload).execute()
+        if not response.data:
+            return jsonify({"error": "No se pudo crear la persona"}), 500
+        persona = response.data[0]
+        try:
+            qr_name = generar_qr(f"{request.host_url.rstrip('/')}/p/{persona['id']}")
+            qr_update = (current_app.supabase.table("personas")
+                .update({"qr": qr_name}).eq("id", persona["id"]).eq("owner_id", str(current_user.id)).execute())
+            if qr_update.data:
+                persona = qr_update.data[0]
+        except Exception as qr_exc:
+            print(f"⚠️ Error generando QR de persona: {qr_exc}")
+        return jsonify(persona), 201
     except Exception as exc:
         print(f"❌ Error creando persona: {exc}")
         return jsonify({"error": "No se pudo crear la persona"}), 500
-    if not response.data:
-        return jsonify({"error": "No se pudo crear la persona"}), 500
-    return jsonify(response.data[0]), 201
+
+
+@persona_bp.post("/<persona_id>/qr")
+@login_required
+def api_persona_qr(persona_id, current_user=None):
+    """Regenera el QR canónico de una persona sin tocar QR históricos."""
+    persona_id = _valid_uuid(persona_id)
+    if not persona_id:
+        return jsonify({"error": "ID de persona inválido"}), 400
+    persona = _persona_owned(persona_id, current_user)
+    if not persona:
+        return jsonify({"error": "Persona no encontrada"}), 404
+    try:
+        qr_name = generar_qr(f"{request.host_url.rstrip('/')}/p/{persona_id}")
+        response = (current_app.supabase.table("personas")
+            .update({"qr": qr_name}).eq("id", persona_id).eq("owner_id", str(current_user.id)).execute())
+        if not response.data:
+            return jsonify({"error": "No se pudo guardar el QR"}), 500
+        return jsonify({"persona_id": persona_id, "qr": qr_name, "qr_url": f"/static/qr/{qr_name}", "target": f"/p/{persona_id}"})
+    except Exception as exc:
+        print(f"❌ Error generando QR persona: {exc}")
+        return jsonify({"error": "No se pudo generar el QR"}), 500
 
 
 @persona_bp.post("/<persona_id>/conversations")
