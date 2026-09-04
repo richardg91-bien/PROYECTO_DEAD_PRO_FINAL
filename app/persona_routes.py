@@ -11,6 +11,7 @@ from app.character.personality import normalizar_personalidad
 from app.services.upload_service import generar_qr
 from app.services.persona_memory_service import guardar_memoria_persona, obtener_memorias_persona, actualizar_memoria_persona, eliminar_memoria_persona
 from app.ia_service import generar_embedding
+from app.voice.voice_service import sintetizar_voz
 
 persona_bp = Blueprint("persona", __name__, url_prefix="/api/personas")
 
@@ -301,15 +302,25 @@ def api_persona_chat(persona_id):
         if not conversation:return jsonify({"error":"No se pudo iniciar la conversación"}),500
         conversation_id=conversation["id"]
     try:
-        # La fuente de verdad del historial es la conversación persistida y protegida
-        # por session_id; el historial enviado por el navegador se ignora.
         historial=_historial_persistido(conversation_id,session_id)
         resultado=generar_respuesta(persona_id,message,historial)
         if not resultado:return jsonify({"error":"Persona no encontrada"}),404
         emocion=resultado["emocion"]
+        respuesta=resultado["respuesta"]
         if not guardar_mensaje(conversation_id,"visitor",message,emotion={"detected":emocion}):
             return jsonify({"error":"No se pudo guardar el mensaje del visitante"}),500
-        if not guardar_mensaje(conversation_id,"persona",resultado["respuesta"],emotion={"visitor":emocion}):
+        if not guardar_mensaje(conversation_id,"persona",respuesta,emotion={"visitor":emocion}):
             return jsonify({"error":"No se pudo guardar la respuesta"}),500
-        return jsonify({"conversation_id":conversation_id,"session_id":session_id,"persona":resultado["persona"],"respuesta":resultado["respuesta"],"emocion":emocion,"audio":None})
+
+        # Piper es una capa de presentación opcional: un fallo de TTS no rompe el chat.
+        audio_url = sintetizar_voz(respuesta, emocion)
+        return jsonify({
+            "conversation_id": conversation_id,
+            "session_id": session_id,
+            "persona": resultado["persona"],
+            "respuesta": respuesta,
+            "emocion": emocion,
+            "audio_url": audio_url,
+            "audio": audio_url,
+        })
     except Exception as exc: print(f"❌ Error Character Engine: {exc}"); return jsonify({"error":"No se pudo generar la respuesta"}),500
