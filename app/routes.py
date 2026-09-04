@@ -79,7 +79,31 @@ def api_experiencia(id):
         print(f"❌ Error detalle: {e}")
         return jsonify({"error": "Error interno"}), 500
 
-# LEGACY: se mantienen para compatibilidad con usuarios y enlaces existentes.
+# LEGACY EXPERIENCE: conserva los QR y enlaces históricos /experiencia/<id>.
+@main.route("/experiencia/<id>")
+def experiencia_legacy(id):
+    try:
+        res = current_app.supabase.table("experiences").select("*").eq("id", id).limit(1).execute()
+        if not res.data:
+            return render_template("error.html", message="Experiencia no encontrada"), 404
+        return render_template("experiencia.html", item=res.data[0])
+    except Exception as e:
+        print(f"❌ Error experiencia legacy: {e}")
+        return render_template("error.html", message="Error interno del servidor"), 500
+
+# LEGACY PERSONA: conserva el acceso por nombre usado por los enlaces antiguos.
+@main.route("/persona/<nombre>")
+def persona_legacy(nombre):
+    try:
+        res = (current_app.supabase.table("experiences")
+               .select("*").eq("persona", nombre)
+               .order("created_at", desc=True).execute())
+        return render_template("persona.html", persona=nombre, recuerdos=res.data or [])
+    except Exception as e:
+        print(f"❌ Error persona legacy: {e}")
+        return render_template("error.html", message="Error interno del servidor"), 500
+
+# LEGACY CHAT: se mantienen para compatibilidad con usuarios y enlaces existentes.
 @main.route("/chat", methods=["GET", "POST"])
 @login_required
 def chat(current_user=None):
