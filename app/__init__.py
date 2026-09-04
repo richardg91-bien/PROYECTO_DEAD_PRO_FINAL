@@ -28,11 +28,9 @@ def create_app():
         supports_credentials=True
     )
 
-    # =========================
-    # VARIABLES DE ENTORNO
-    # =========================
     SUPABASE_URL = os.getenv("SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+    SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     DEEPSEEK_API_KEY = os.getenv("GROQ_API_KEY")
 
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -41,11 +39,18 @@ def create_app():
     if not DEEPSEEK_API_KEY:
         print("Warning: falta GROQ_API_KEY")
 
-    # =========================
-    # CLIENTES EXTERNOS
-    # =========================
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        print("Warning: falta SUPABASE_SERVICE_ROLE_KEY; las respuestas de la PERSONA no podran persistirse bajo RLS")
 
+    # Cliente publico: mantiene RLS para las operaciones de visitantes.
     app.supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+    # Cliente exclusivo del servidor: el service role nunca se expone al navegador.
+    app.supabase_admin = (
+        create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        if SUPABASE_SERVICE_ROLE_KEY
+        else None
+    )
 
     if DEEPSEEK_API_KEY:
         app.openai_client = OpenAI(
@@ -55,20 +60,13 @@ def create_app():
     else:
         app.openai_client = None
 
-    # =========================
-    # CONFIGURACIÓN APP
-    # =========================
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev_secret")
     if app.config["SECRET_KEY"] == "dev_secret":
         print("Warning: usando SECRET_KEY de desarrollo. Define SECRET_KEY en produccion.")
 
-    # Crear carpetas necesarias
     for folder in ["static/uploads", "static/qr", "static/audio"]:
         os.makedirs(folder, exist_ok=True)
 
-    # =========================
-    # REGISTRO DE RUTAS
-    # =========================
     from app.routes import main
     app.register_blueprint(main)
 
