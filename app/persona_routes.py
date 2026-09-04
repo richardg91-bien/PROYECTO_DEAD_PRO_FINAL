@@ -8,6 +8,8 @@ from app.character.identity import get_persona_by_id, get_persona_by_slug
 from app.character.character_engine import generar_respuesta
 from app.character.conversation import crear_conversacion, obtener_conversacion, guardar_mensaje, obtener_mensajes
 from app.services.upload_service import generar_qr
+from app.services.persona_memory_service import guardar_memoria_persona, obtener_memorias_persona, actualizar_memoria_persona, eliminar_memoria_persona
+from app.ia_service import generar_embedding
 
 persona_bp = Blueprint("persona", __name__, url_prefix="/api/personas")
 
@@ -20,16 +22,18 @@ def _session_id(value):
     return value if value and len(value) <= 200 else str(uuid.uuid4())
 
 def _persona_owned(persona_id, current_user):
-    response = (current_app.supabase.table("personas").select("id,nombre,slug,owner_id,qr")
-        .eq("id", persona_id).eq("owner_id", str(current_user.id)).limit(1).execute())
+    response = (current_app.supabase.table("personas").select("id,nombre,slug,owner_id,qr").eq("id", persona_id).eq("owner_id", str(current_user.id)).limit(1).execute())
     return response.data[0] if response.data else None
+
+def _memory_type(value):
+    allowed = {"biografia", "experiencia", "familia", "amistad", "trabajo", "gustos", "anecdota", "opinion", "valor", "relacion", "conversacion", "otro"}
+    return value if value in allowed else "otro"
 
 @persona_bp.get("")
 @login_required
 def api_personas(current_user=None):
     try:
-        response = (current_app.supabase.table("personas").select("id,owner_id,nombre,slug,bio,fecha_nacimiento,fecha_fallecimiento,lugar_nacimiento,lugar_fallecimiento,foto_principal,visibilidad,qr,created_at,updated_at")
-            .eq("owner_id", str(current_user.id)).order("created_at", desc=True).execute())
+        response = (current_app.supabase.table("personas").select("id,owner_id,nombre,slug,bio,fecha_nacimiento,fecha_fallecimiento,lugar_nacimiento,lugar_fallecimiento,foto_principal,visibilidad,qr,created_at,updated_at").eq("owner_id", str(current_user.id)).order("created_at", desc=True).execute())
         return jsonify(response.data or [])
     except Exception as exc:
         print(f"❌ Error listando personas: {exc}"); return jsonify({"error":"No se pudieron cargar las personas"}),500
@@ -57,7 +61,7 @@ def api_persona_update(persona_id, current_user=None):
         if not payload["nombre"] or len(payload["nombre"]) > 200: return jsonify({"error":"Nombre inválido"}),400
     if "visibilidad" in payload and payload["visibilidad"] not in ("publica","privada"): return jsonify({"error":"Visibilidad inválida"}),400
     try:
-        response = (current_app.supabase.table("personas").update(payload).eq("id",persona_id).eq("owner_id",str(current_user.id)).execute())
+        response = current_app.supabase.table("personas").update(payload).eq("id",persona_id).eq("owner_id",str(current_user.id)).execute()
         if not response.data: return jsonify({"error":"No se pudo actualizar la persona"}),500
         return jsonify(response.data[0])
     except Exception as exc:
@@ -72,6 +76,52 @@ def api_persona_experiencias(persona_id):
         response=(current_app.supabase.table("experiences").select("id,persona_id,title,description,image,created_at,ai_description,qr").eq("persona_id",persona_id).order("created_at",desc=True).execute())
         return jsonify(response.data or [])
     except Exception as exc: print(f"❌ Error experiencias persona: {exc}"); return jsonify({"error":"Error interno"}),500
+
+@persona_bp.get("/<persona_id>/memorias")
+@login_required
+def api_persona_memorias(persona_id, current_user=None):
+    persona_id = _valid_uuid(persona_id)
+    if not persona_id or not _persona_owned(persona_id, current_user): return jsonify({"error":"Persona no encontrada"}),404
+    return jsonify(obtener_memorias_persona(persona_id, embedding=None, limit=100))
+
+@persona_bp.post("/<persona_id>/memorias")
+@login_required
+def api_persona_memoria_create(persona_id, current_user=None):
+    persona_id = _valid_uuid(persona_id)
+    if not persona_id or not _persona_owned(persona_id, current_user): return jsonify({"error":"Persona no encontrada"}),404
+    data = request.get_json(silent=True) or {}
+    contenido = str(data.get("contenido") or "").strip()
+    if not contenido or len(contenido) > 10000: return jsonify({"error":"Contenido de memoria inválido"}),400
+    tipo = _memory_type(data.get("tipo", "otro"))
+    try:
+        importancia = max(1, min(5, int(data.get("importancia", 3))))
+        embedding = generar_embedding(contenido)
+        memoria = guardar_memoria_persona(persona_id, contenido, embedding, tipo=tipo, origen="manual", importancia=importancia)
+        if not memoria: return jsonify({"error":"No se pudo guardar la memoria"}),500
+        return jsonify(memoria),201
+    except (TypeError, ValueError): return jsonify({"error":"Importancia inválida"}),400
+    except Exception as exc: print(f"❌ Error creando memoria: {exc}"); return jsonify({"error":"No se pudo crear la memoria"}),500
+
+@persona_bp.put("/<persona_id>/memorias/<memoria_id>")
+@login_required
+def api_persona_memoria_update(persona_id, memoria_id, current_user=None):
+    persona_id = _valid_uuid(persona_id); memoria_id = _valid_uuid(memoria_id)
+    if not persona_id or not memoria_id or not _persona_owned(persona_id, current_user): return jsonify({"error":"Memoria no encontrada"}),404
+    data = request.get_json(silent=True) or {}
+    tipo = _memory_type(data["tipo"]) if "tipo" in data else None
+    try:
+        memoria = actualizar_memoria_persona(persona_id, memoria_id, data.get("contenido"), tipo, data.get("importancia"))
+        if not memoria: return jsonify({"error":"Memoria no encontrada o sin cambios"}),404
+        return jsonify(memoria)
+    except (TypeError, ValueError): return jsonify({"error":"Importancia inválida"}),400
+
+@persona_bp.delete("/<persona_id>/memorias/<memoria_id>")
+@login_required
+def api_persona_memoria_delete(persona_id, memoria_id, current_user=None):
+    persona_id = _valid_uuid(persona_id); memoria_id = _valid_uuid(memoria_id)
+    if not persona_id or not memoria_id or not _persona_owned(persona_id, current_user): return jsonify({"error":"Memoria no encontrada"}),404
+    if not eliminar_memoria_persona(persona_id, memoria_id): return jsonify({"error":"Memoria no encontrada"}),404
+    return jsonify({"ok":True,"id":memoria_id})
 
 @persona_bp.get("/slug/<slug>")
 def api_persona_slug(slug):
