@@ -1,5 +1,7 @@
 """Persistencia de conversaciones de Visión 1."""
 
+import uuid
+
 from flask import current_app
 
 VALID_ROLES = {"visitor", "persona", "system"}
@@ -8,13 +10,27 @@ VALID_ROLES = {"visitor", "persona", "system"}
 def crear_conversacion(persona_id, session_id, visitor_id=None, metadata=None):
     if not persona_id or not session_id:
         return None
-    payload = {"persona_id": str(persona_id), "session_id": str(session_id), "metadata": metadata or {}}
+
+    conversation_id = str(uuid.uuid4())
+    payload = {
+        "id": conversation_id,
+        "persona_id": str(persona_id),
+        "session_id": str(session_id),
+        "metadata": metadata or {},
+    }
     if visitor_id:
         payload["visitor_id"] = str(visitor_id)
+
     try:
-        response = current_app.supabase.table("conversations").insert(payload).execute()
-        data = response.data or []
-        return data[0] if data else None
+        # No necesitamos que PostgREST devuelva la fila. Con RLS no existe una
+        # SELECT pública de conversations; pedir RETURNING representation haría
+        # que un INSERT válido fallara al intentar devolver la fila.
+        response = current_app.supabase.table("conversations").insert(
+            payload, returning="minimal"
+        ).execute()
+        if response is None:
+            return None
+        return payload
     except Exception as exc:
         print(f"ERROR crear_conversacion: {exc}")
         return None
@@ -43,17 +59,26 @@ def obtener_conversacion(conversation_id, session_id=None):
 def guardar_mensaje(conversation_id, role, content, emotion=None, metadata=None):
     if not conversation_id or role not in VALID_ROLES or not content:
         return None
+
+    message_id = str(uuid.uuid4())
     payload = {
+        "id": message_id,
         "conversation_id": str(conversation_id),
         "role": role,
         "content": str(content),
         "emotion": emotion or {},
         "metadata": metadata or {},
     }
+
     try:
-        response = current_app.supabase.table("conversation_messages").insert(payload).execute()
-        data = response.data or []
-        return data[0] if data else None
+        # Igual que conversations: la persistencia pública no necesita un
+        # RETURNING de la fila, porque las lecturas pasan por RPC protegidas.
+        response = current_app.supabase.table("conversation_messages").insert(
+            payload, returning="minimal"
+        ).execute()
+        if response is None:
+            return None
+        return payload
     except Exception as exc:
         print(f"ERROR guardar_mensaje: {exc}")
         return None
