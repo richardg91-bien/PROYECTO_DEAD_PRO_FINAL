@@ -1,5 +1,7 @@
 """Motor canónico de conversación de una PERSONA."""
 
+import os
+
 from flask import current_app
 
 from app.character.identity import get_persona_by_id
@@ -71,8 +73,9 @@ EMOCIÓN ACTUAL DEL VISITANTE: {emocion.get('emocion', 'neutral')}
             messages.append({"role": role, "content": str(content)})
     messages.append({"role": "user", "content": mensaje})
 
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b").strip()
     response = current_app.openai_client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model=model,
         messages=messages,
         max_tokens=350,
     )
