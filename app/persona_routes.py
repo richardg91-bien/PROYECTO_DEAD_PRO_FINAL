@@ -60,6 +60,28 @@ def _personality_payload(data):
     return payload
 
 
+def _historial_persistido(conversation_id, session_id):
+    """Convierte mensajes persistidos en el formato esperado por el Character Engine.
+
+    El historial del navegador no se usa como fuente de verdad para evitar que el
+    cliente pueda inyectar contexto arbitrario en la personalidad conversacional.
+    """
+    mensajes = obtener_mensajes(conversation_id, limit=20, session_id=session_id)
+    historial = []
+    for mensaje in mensajes:
+        role = mensaje.get("role")
+        if role == "visitor":
+            role = "user"
+        elif role == "persona":
+            role = "assistant"
+        elif role != "system":
+            continue
+        content = mensaje.get("content")
+        if content:
+            historial.append({"role": role, "content": str(content)})
+    return historial
+
+
 @persona_bp.get("")
 @login_required
 def api_personas(current_user=None):
@@ -266,7 +288,7 @@ def api_conversation(conversation_id):
 def api_persona_chat(persona_id):
     persona_id=_valid_uuid(persona_id)
     if not persona_id:return jsonify({"error":"ID de persona inválido"}),400
-    data=request.get_json(silent=True) or {}; message=(data.get("message") or "").strip(); conversation_id=_valid_uuid(data.get("conversation_id")); session_id=_session_id(data.get("session_id")); historial=data.get("historial") or []
+    data=request.get_json(silent=True) or {}; message=(data.get("message") or "").strip(); conversation_id=_valid_uuid(data.get("conversation_id")); session_id=_session_id(data.get("session_id"))
     if not message:return jsonify({"error":"El mensaje es obligatorio"}),400
     if len(message)>5000:return jsonify({"error":"Mensaje demasiado largo"}),400
     if not get_persona_by_id(current_app,persona_id):return jsonify({"error":"Persona no encontrada"}),404
@@ -279,8 +301,15 @@ def api_persona_chat(persona_id):
         if not conversation:return jsonify({"error":"No se pudo iniciar la conversación"}),500
         conversation_id=conversation["id"]
     try:
+        # La fuente de verdad del historial es la conversación persistida y protegida
+        # por session_id; el historial enviado por el navegador se ignora.
+        historial=_historial_persistido(conversation_id,session_id)
         resultado=generar_respuesta(persona_id,message,historial)
         if not resultado:return jsonify({"error":"Persona no encontrada"}),404
-        emocion=resultado["emocion"]; guardar_mensaje(conversation_id,"visitor",message,emotion={"detected":emocion}); guardar_mensaje(conversation_id,"persona",resultado["respuesta"],emotion={"visitor":emocion})
+        emocion=resultado["emocion"]
+        if not guardar_mensaje(conversation_id,"visitor",message,emotion={"detected":emocion}):
+            return jsonify({"error":"No se pudo guardar el mensaje del visitante"}),500
+        if not guardar_mensaje(conversation_id,"persona",resultado["respuesta"],emotion={"visitor":emocion}):
+            return jsonify({"error":"No se pudo guardar la respuesta"}),500
         return jsonify({"conversation_id":conversation_id,"session_id":session_id,"persona":resultado["persona"],"respuesta":resultado["respuesta"],"emocion":emocion,"audio":None})
     except Exception as exc: print(f"❌ Error Character Engine: {exc}"); return jsonify({"error":"No se pudo generar la respuesta"}),500
