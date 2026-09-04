@@ -17,6 +17,7 @@ function getSessionId(personaId) {
 export default function PersonaChat() {
   const { personaId } = useParams();
   const [persona, setPersona] = useState(null);
+  const [experiencias, setExperiencias] = useState([]);
   const [historial, setHistorial] = useState([]);
   const [input, setInput] = useState("");
   const [emocion, setEmocion] = useState("neutral");
@@ -26,14 +27,21 @@ export default function PersonaChat() {
   const conversationId = useRef(null);
   const sessionId = useRef(null);
   const bottomRef = useRef(null);
+  const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
   useEffect(() => {
     sessionId.current = getSessionId(personaId);
     let activo = true;
     async function cargar() {
       try {
-        const res = await api.get(`/api/personas/${personaId}`);
-        if (activo) setPersona(res.data);
+        const [personaRes, experienciasRes] = await Promise.all([
+          api.get(`/api/personas/${personaId}`),
+          api.get(`/api/personas/${personaId}/experiencias`),
+        ]);
+        if (activo) {
+          setPersona(personaRes.data);
+          setExperiencias(experienciasRes.data || []);
+        }
       } catch (err) {
         if (activo) setError(err?.response?.data?.error || "No se pudo cargar el memorial");
       } finally {
@@ -85,15 +93,14 @@ export default function PersonaChat() {
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <Link to="/" className="text-gray-400 hover:text-amber-600 text-xl">←</Link>
           {persona.foto_principal ? <img src={persona.foto_principal} alt={persona.nombre} className="w-11 h-11 rounded-full object-cover border-2 border-amber-400" /> : <div className="w-11 h-11 rounded-full border-2 border-amber-400 flex items-center justify-center bg-amber-50 text-amber-800 font-bold">{persona.nombre?.charAt(0)}</div>}
-          <div className="min-w-0 flex-1">
-            <h1 className="font-serif font-bold text-gray-800 truncate">{persona.nombre}</h1>
-            <p className="text-xs text-gray-500">Memorial digital · {EMOJIS[emocion]} {emocion}</p>
-          </div>
+          <div className="min-w-0 flex-1"><h1 className="font-serif font-bold text-gray-800 truncate">{persona.nombre}</h1><p className="text-xs text-gray-500">Memorial digital · {EMOJIS[emocion]} {emocion}</p></div>
         </div>
       </header>
+
       <main className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-2xl mx-auto space-y-4">
-          {historial.length === 0 && <section className="text-center py-12"><div className="text-5xl mb-4">🕊️</div><h2 className="font-serif text-2xl font-bold text-gray-800 mb-2">{persona.nombre}</h2>{persona.bio && <p className="text-gray-500 max-w-lg mx-auto mb-5">{persona.bio}</p>}<p className="text-sm text-gray-400">Podés iniciar una conversación con este memorial.</p></section>}
+        <div className="max-w-2xl mx-auto space-y-5">
+          {historial.length === 0 && <section className="text-center py-8"><div className="text-5xl mb-4">🕊️</div><h2 className="font-serif text-2xl font-bold text-gray-800 mb-2">{persona.nombre}</h2>{persona.bio && <p className="text-gray-500 max-w-lg mx-auto mb-5">{persona.bio}</p>}<p className="text-sm text-gray-400">Podés iniciar una conversación con este memorial.</p></section>}
+          {experiencias.length > 0 && historial.length === 0 && <section><h3 className="font-serif font-bold text-gray-700 mb-3">Recuerdos</h3><div className="grid gap-3 sm:grid-cols-2">{experiencias.map((item) => <article key={item.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">{item.image && <img src={`${baseUrl}/static/uploads/${item.image}`} alt={item.title || "Recuerdo"} className="w-full h-40 object-cover" />}<div className="p-4"><h4 className="font-serif font-bold text-gray-800">{item.title || "Recuerdo"}</h4>{item.description && <p className="text-sm text-gray-500 mt-1">{item.description}</p>}</div></article>)}</div></section>}
           {historial.map((m, i) => <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${m.role === "user" ? "bg-amber-600 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm"}`}>{m.content}</div></div>)}
           {enviando && <div className="text-gray-400 text-sm">El memorial está preparando una respuesta…</div>}
           {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{error}</div>}
