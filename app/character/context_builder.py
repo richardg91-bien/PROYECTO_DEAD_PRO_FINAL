@@ -9,12 +9,8 @@ def _lista(valor):
     return [valor]
 
 
-def construir_contexto_personaje(persona, personalidad, recuerdos, emocion_visitante, historial=None):
-    """Devuelve contexto estable para que el LLM interprete a la PERSONA.
-
-    La identidad y personalidad son permanentes. La emoción del visitante
-    solo modifica el tono contextual de la conversación.
-    """
+def construir_contexto_personaje(persona, personalidad, recuerdos, emocion_visitante, historial=None, experiencias=None):
+    """Devuelve contexto estable para que el LLM interprete a la PERSONA."""
     return {
         "identidad": {
             "id": persona.get("id"),
@@ -35,10 +31,9 @@ def construir_contexto_personaje(persona, personalidad, recuerdos, emocion_visit
             "disgustos": _lista((personalidad or {}).get("dislikes")),
             "reglas": _lista((personalidad or {}).get("behavioral_rules")),
         },
+        "experiencias": experiencias or [],
         "memorias": recuerdos or [],
-        "emocion_visitante": emocion_visitante or {
-            "emocion": "neutral", "intensidad": 0.0, "confianza": 0.0
-        },
+        "emocion_visitante": emocion_visitante or {"emocion": "neutral", "intensidad": 0.0, "confianza": 0.0},
         "historial": (historial or [])[-10:],
     }
 
@@ -46,8 +41,15 @@ def construir_contexto_personaje(persona, personalidad, recuerdos, emocion_visit
 def contexto_a_prompt(contexto):
     identidad = contexto["identidad"]
     personalidad = contexto["personalidad"]
+    experiencias = contexto.get("experiencias") or []
     memorias = contexto["memorias"]
     emocion = contexto["emocion_visitante"]
+
+    experiencias_texto = "\n".join(
+        f"- {e.get('title') or 'Experiencia'}: {e.get('description') or e.get('ai_description') or ''}"
+        for e in experiencias
+        if e.get("description") or e.get("ai_description") or e.get("title")
+    ) or "- No hay experiencias registradas."
 
     recuerdos_texto = "\n".join(
         f"- {m.get('contenido', '')} [tipo={m.get('tipo', 'otro')}; importancia={m.get('importancia', 3)}/5]"
@@ -61,6 +63,9 @@ Nacimiento: {identidad['fecha_nacimiento'] or 'desconocido'}
 Fallecimiento: {identidad['fecha_fallecimiento'] or 'desconocido'}
 Lugar de nacimiento: {identidad['lugar_nacimiento'] or 'desconocido'}
 Lugar de fallecimiento: {identidad['lugar_fallecimiento'] or 'desconocido'}
+
+EXPERIENCIAS REGISTRADAS
+{experiencias_texto}
 
 PERSONALIDAD
 Rasgos: {personalidad['rasgos']}
