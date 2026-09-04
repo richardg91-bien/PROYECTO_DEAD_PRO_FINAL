@@ -9,24 +9,11 @@ def _lista(valor):
     return [valor]
 
 
-def _seccion_personalidad(personalidad):
-    p = personalidad or {}
-    return {
-        "rasgos": p.get("traits") or {},
-        "valores": p.get("values") or {},
-        "temperamento": p.get("temperament") or {},
-        "comunicacion": p.get("communication_style") or {},
-        "humor": p.get("humor_style") or {},
-        "gustos": _lista(p.get("likes")),
-        "disgustos": _lista(p.get("dislikes")),
-        "reglas": _lista(p.get("behavioral_rules")),
-    }
-
-
 def construir_contexto_personaje(persona, personalidad, recuerdos, emocion_visitante, historial=None):
-    """Devuelve un contexto estable y serializable para el prompt del LLM.
+    """Devuelve contexto estable para que el LLM interprete a la PERSONA.
 
-    La emoción del visitante es contextual y no altera la personalidad permanente.
+    La identidad y personalidad son permanentes. La emoción del visitante
+    solo modifica el tono contextual de la conversación.
     """
     return {
         "identidad": {
@@ -38,7 +25,16 @@ def construir_contexto_personaje(persona, personalidad, recuerdos, emocion_visit
             "lugar_nacimiento": persona.get("lugar_nacimiento"),
             "lugar_fallecimiento": persona.get("lugar_fallecimiento"),
         },
-        "personalidad": _seccion_personalidad(personalidad),
+        "personalidad": {
+            "rasgos": (personalidad or {}).get("traits") or {},
+            "valores": (personalidad or {}).get("values") or {},
+            "temperamento": (personalidad or {}).get("temperament") or {},
+            "comunicacion": (personalidad or {}).get("communication_style") or {},
+            "humor": (personalidad or {}).get("humor_style") or {},
+            "gustos": _lista((personalidad or {}).get("likes")),
+            "disgustos": _lista((personalidad or {}).get("dislikes")),
+            "reglas": _lista((personalidad or {}).get("behavioral_rules")),
+        },
         "memorias": recuerdos or [],
         "emocion_visitante": emocion_visitante or {
             "emocion": "neutral", "intensidad": 0.0, "confianza": 0.0
