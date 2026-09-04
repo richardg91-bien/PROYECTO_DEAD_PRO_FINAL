@@ -4,8 +4,9 @@ from flask import current_app
 
 from app.character.identity import get_persona_by_id
 from app.character.personality import obtener_personalidad, normalizar_personalidad
+from app.character.context_builder import construir_contexto_personaje, contexto_a_prompt
 from app.services.persona_memory_service import obtener_memorias_persona
-from app.services.emotion_service import detectar_emocion
+from app.services.emotion_service import analizar_emocion
 from app.ia_service import generar_embedding
 
 
@@ -24,13 +25,13 @@ def construir_contexto(persona_id, mensaje, historial=None):
     except Exception as exc:
         current_app.logger.warning("No se pudieron recuperar memorias: %s", exc)
 
-    return {
-        "persona": persona,
-        "personalidad": personalidad,
-        "recuerdos": recuerdos,
-        "emocion_visitante": detectar_emocion(mensaje),
-        "historial": (historial or [])[-10:],
-    }
+    return construir_contexto_personaje(
+        persona,
+        personalidad,
+        recuerdos,
+        analizar_emocion(mensaje),
+        historial,
+    )
 
 
 def generar_respuesta(persona_id, mensaje, historial=None):
@@ -38,41 +39,28 @@ def generar_respuesta(persona_id, mensaje, historial=None):
     if not contexto:
         return None
 
-    persona = contexto["persona"]
-    personalidad = contexto["personalidad"]
-    recuerdos = contexto["recuerdos"]
+    identidad = contexto["identidad"]
     emocion = contexto["emocion_visitante"]
 
-    recuerdos_texto = "\n".join(
-        f"- {item.get('contenido', '')} (tipo: {item.get('tipo', 'otro')}, importancia: {item.get('importancia', 3)}/5)"
-        for item in recuerdos if item.get("contenido")
-    ) or "- No hay recuerdos relevantes registrados."
+    system_prompt = f"""Sos la representación conversacional de {identidad['nombre']}.
 
-    system_prompt = f"""Sos la representación conversacional de {persona.get('nombre', 'esta persona')}.
+{contexto_a_prompt(contexto)}
 
-IDENTIDAD:
-{persona.get('bio') or 'No hay biografía adicional registrada.'}
-Nacimiento: {persona.get('fecha_nacimiento') or 'desconocido'}
-Fallecimiento: {persona.get('fecha_fallecimiento') or 'desconocido'}
-Lugar de nacimiento: {persona.get('lugar_nacimiento') or 'desconocido'}
-Lugar de fallecimiento: {persona.get('lugar_fallecimiento') or 'desconocido'}
-
-PERSONALIDAD ESTRUCTURADA:
-{personalidad}
-
-MEMORIAS RELEVANTES DE ESTA PERSONA:
-{recuerdos_texto}
-
-EMOCIÓN DETECTADA DEL VISITANTE: {emocion}
-
-REGLAS:
+REGLAS DE CONVERSACIÓN
 - Respondé en español natural y humano.
-- Mantené coherencia con la identidad y personalidad registrada.
-- Usá los recuerdos como contexto, priorizando los de mayor relevancia e importancia.
+- Mantené coherencia estricta con la identidad y personalidad registrada.
+- Usá los recuerdos como contexto, priorizando relevancia e importancia.
 - No inventes hechos biográficos como si fueran recuerdos reales.
-- Si no existe información suficiente, reconocé la incertidumbre de forma natural.
+- Si no existe información suficiente, reconocé la incertidumbre naturalmente.
 - No afirmes que una persona fallecida realmente está viva ni que la IA es literalmente la persona.
-- Evitá romper el tono emocional de una conversación de homenaje.
+- Evitá romper el tono emocional de un homenaje.
+- La emoción detectada pertenece al visitante y solo sirve para adaptar el tono de la respuesta.
+- No conviertas una emoción puntual en un rasgo permanente de personalidad.
+- Si el visitante expresa tristeza, nostalgia o amor, respondé con mayor calidez y empatía sin inventar recuerdos.
+- Si expresa enojo, mantené calma y respeto.
+- Si expresa miedo o preocupación, priorizá contención y claridad.
+
+EMOCIÓN ACTUAL DEL VISITANTE: {emocion.get('emocion', 'neutral')}
 """
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -90,7 +78,8 @@ REGLAS:
     )
     return {
         "respuesta": response.choices[0].message.content.strip(),
-        "emocion": emocion,
-        "persona": persona,
-        "memorias_utilizadas": len(recuerdos),
+        "emocion": emocion.get("emocion", "neutral"),
+        "emocion_contexto": emocion,
+        "persona": contexto["identidad"],
+        "memorias_utilizadas": len(contexto["memorias"]),
     }
