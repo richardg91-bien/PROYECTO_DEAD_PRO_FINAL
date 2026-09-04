@@ -11,7 +11,6 @@ click==8.1.8
 python-dotenv==1.2.2
 
 # ── Supabase ─────────────────────────────────────────────
-# Version 2.31.x supports modern Python/httpx combinations.
 supabase==2.31.0
 
 # ── HTTP / utils ─────────────────────────────────────────
