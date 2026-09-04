@@ -3,6 +3,40 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 
 const TIPOS = ["biografia", "experiencia", "familia", "amistad", "trabajo", "gustos", "anecdota", "opinion", "valor", "relacion", "otro"];
+const LIST_FIELDS = ["likes", "dislikes", "behavioral_rules"];
+const OBJECT_FIELDS = ["traits", "values", "temperament", "communication_style", "humor_style"];
+const PERSONALITY_LABELS = {
+  traits: "Rasgos de carácter",
+  values: "Valores",
+  temperament: "Temperamento",
+  communication_style: "Estilo de comunicación",
+  humor_style: "Sentido del humor",
+  likes: "Gustos",
+  dislikes: "Disgustos",
+  behavioral_rules: "Reglas de comportamiento",
+};
+
+const emptyPersonality = {
+  traits: {}, values: {}, temperament: {}, communication_style: {}, humor_style: {},
+  likes: [], dislikes: [], behavioral_rules: [],
+};
+
+function objectToText(value) {
+  return Object.entries(value || {}).map(([key, val]) => `${key}: ${typeof val === "string" ? val : JSON.stringify(val)}`).join("\n");
+}
+
+function textToObject(text) {
+  const result = {};
+  String(text || "").split("\n").map(line => line.trim()).filter(Boolean).forEach(line => {
+    const index = line.indexOf(":");
+    if (index > 0) result[line.slice(0, index).trim()] = line.slice(index + 1).trim();
+    else result[line] = true;
+  });
+  return result;
+}
+
+function listToText(value) { return (value || []).join("\n"); }
+function textToList(text) { return String(text || "").split("\n").map(x => x.trim()).filter(Boolean); }
 
 export default function PersonaAdmin() {
   const { personaId } = useParams();
@@ -10,21 +44,31 @@ export default function PersonaAdmin() {
   const [persona, setPersona] = useState(null);
   const [experiencias, setExperiencias] = useState([]);
   const [memorias, setMemorias] = useState([]);
+  const [personality, setPersonality] = useState(emptyPersonality);
+  const [personalityText, setPersonalityText] = useState({});
   const [form, setForm] = useState({});
   const [memoriaForm, setMemoriaForm] = useState({ contenido: "", tipo: "anecdota", importancia: 3 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingPersonality, setSavingPersonality] = useState(false);
   const [savingMemoria, setSavingMemoria] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
 
   async function cargar() {
-    const [p, e, m] = await Promise.all([
+    const [p, e, m, per] = await Promise.all([
       api.get(`/api/personas/${personaId}`),
       api.get(`/api/personas/${personaId}/experiencias`),
       api.get(`/api/personas/${personaId}/memorias`),
+      api.get(`/api/personas/${personaId}/personalidad`),
     ]);
     setPersona(p.data); setForm(p.data); setExperiencias(e.data || []); setMemorias(m.data || []);
+    const next = { ...emptyPersonality, ...(per.data || {}) };
+    setPersonality(next);
+    const text = {};
+    OBJECT_FIELDS.forEach(field => { text[field] = objectToText(next[field]); });
+    LIST_FIELDS.forEach(field => { text[field] = listToText(next[field]); });
+    setPersonalityText(text);
   }
 
   useEffect(() => {
@@ -46,6 +90,28 @@ export default function PersonaAdmin() {
       setPersona(res.data); setForm(res.data); setOk("Identidad actualizada correctamente.");
     } catch (err) { setError(err.response?.data?.error || "No se pudo guardar la identidad."); }
     finally { setSaving(false); }
+  }
+
+  function changePersonality(field, value) {
+    setPersonalityText(prev => ({ ...prev, [field]: value }));
+  }
+
+  async function guardarPersonalidad(e) {
+    e.preventDefault(); setSavingPersonality(true); setError(""); setOk("");
+    const payload = { ...personality };
+    OBJECT_FIELDS.forEach(field => { payload[field] = textToObject(personalityText[field]); });
+    LIST_FIELDS.forEach(field => { payload[field] = textToList(personalityText[field]); });
+    try {
+      const res = await api.put(`/api/personas/${personaId}/personalidad`, payload);
+      const next = { ...emptyPersonality, ...(res.data || {}) };
+      setPersonality(next);
+      const text = {};
+      OBJECT_FIELDS.forEach(field => { text[field] = objectToText(next[field]); });
+      LIST_FIELDS.forEach(field => { text[field] = listToText(next[field]); });
+      setPersonalityText(text);
+      setOk("Personalidad guardada. El Character Engine ya puede utilizar estos rasgos.");
+    } catch (err) { setError(err.response?.data?.error || "No se pudo guardar la personalidad."); }
+    finally { setSavingPersonality(false); }
   }
 
   async function agregarMemoria(e) {
@@ -88,6 +154,13 @@ export default function PersonaAdmin() {
         <div><label className="block text-sm font-semibold text-gray-700 mb-1">Biografía</label><textarea name="bio" value={form.bio || ''} onChange={change} rows={5} maxLength={5000} className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none" /></div>
         <div><label className="block text-sm font-semibold text-gray-700 mb-1">Visibilidad</label><select name="visibilidad" value={form.visibilidad || 'publica'} onChange={change} className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm"><option value="publica">Pública</option><option value="privada">Privada</option></select></div>
         <button disabled={saving} className="w-full py-3 rounded-full text-white font-semibold disabled:opacity-50" style={{background:'linear-gradient(to right,#C4973B,#D4A853)'}}>{saving ? 'Guardando…' : 'Guardar identidad'}</button>
+      </form>
+
+      <form onSubmit={guardarPersonalidad} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        <div><h2 className="font-serif text-xl font-bold text-gray-800">Personalidad de {persona.nombre}</h2><p className="text-sm text-gray-400 mt-1">Definí cómo piensa, siente y se comunica. La personalidad es independiente de las memorias.</p></div>
+        {OBJECT_FIELDS.map(field => <div key={field}><label className="block text-sm font-semibold text-gray-700 mb-1">{PERSONALITY_LABELS[field]}</label><textarea value={personalityText[field] || ''} onChange={e => changePersonality(field, e.target.value)} rows={3} placeholder="Ej.: tranquilo: suele escuchar antes de responder\namable: trata a todos con respeto" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none" /><p className="text-xs text-gray-400 mt-1">Una característica por línea. Para rasgos estructurados usá <b>clave: valor</b>.</p></div>)}
+        {LIST_FIELDS.map(field => <div key={field}><label className="block text-sm font-semibold text-gray-700 mb-1">{PERSONALITY_LABELS[field]}</label><textarea value={personalityText[field] || ''} onChange={e => changePersonality(field, e.target.value)} rows={3} placeholder="Un elemento por línea…" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none" /></div>)}
+        <button disabled={savingPersonality} className="w-full py-3 rounded-full text-white font-semibold disabled:opacity-50" style={{background:'linear-gradient(to right,#7B5E2E,#B88A3A)'}}>{savingPersonality ? 'Guardando personalidad…' : 'Guardar personalidad'}</button>
       </form>
 
       <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
