@@ -25,6 +25,21 @@ def _session_id(value):
     return value
 
 
+@persona_bp.get("")
+@login_required
+def api_personas(current_user=None):
+    """Lista las personas del propietario autenticado."""
+    try:
+        response = (current_app.supabase.table("personas")
+            .select("id,owner_id,nombre,slug,bio,fecha_nacimiento,fecha_fallecimiento,lugar_nacimiento,lugar_fallecimiento,foto_principal,visibilidad,created_at,updated_at")
+            .eq("owner_id", str(current_user.id))
+            .order("created_at", desc=True).execute())
+        return jsonify(response.data or [])
+    except Exception as exc:
+        print(f"❌ Error listando personas: {exc}")
+        return jsonify({"error": "No se pudieron cargar las personas"}), 500
+
+
 @persona_bp.get("/<persona_id>")
 def api_persona(persona_id):
     persona_id = _valid_uuid(persona_id)
