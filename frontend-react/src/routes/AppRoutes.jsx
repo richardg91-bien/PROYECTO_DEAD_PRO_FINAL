@@ -13,6 +13,7 @@ import AdminLogin from "../pages/AdminLogin";
 import AdminDashboard from "../pages/AdminDashboard";
 import ChatPersona from "../pages/ChatPersona";
 import PersonaChat from "../pages/PersonaChat";
+import PersonaAdmin from "../pages/PersonaAdmin";
 
 export default function AppRoutes() {
   return (
@@ -23,20 +24,14 @@ export default function AppRoutes() {
           <Route path="/home" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Register />} />
-
-          {/* NUEVO: acceso público por identidad estable */}
           <Route path="/p/:personaId" element={<PersonaChat />} />
-
-          {/* LEGACY: se mantienen las rutas antiguas */}
           <Route path="/chat/:nombre" element={<PrivateRoute><ChatPersona /></PrivateRoute>} />
-
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/galeria" element={<PrivateRoute><Galeria /></PrivateRoute>} />
           <Route path="/upload" element={<PrivateRoute><Upload /></PrivateRoute>} />
-
+          <Route path="/persona/:personaId/administrar" element={<PrivateRoute><PersonaAdmin /></PrivateRoute>} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
-
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
