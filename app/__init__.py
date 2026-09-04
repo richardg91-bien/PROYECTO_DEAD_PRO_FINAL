@@ -79,4 +79,8 @@ def create_app():
     from app.persona_routes import persona_bp
     app.register_blueprint(persona_bp)
 
+    # Visión 1: voz opcional y protegida por la conversación person-centric.
+    from app.voice.routes import voice_bp
+    app.register_blueprint(voice_bp)
+
     return app
