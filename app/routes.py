@@ -1,7 +1,10 @@
 """Rutas principales de la aplicación."""
 
-from flask import Blueprint, render_template, request, redirect, current_app, jsonify
+import re
+import unicodedata
 import uuid
+
+from flask import Blueprint, render_template, request, redirect, current_app, jsonify
 
 from app.auth import login_required
 from app.services.emotion_service import detectar_emocion
@@ -13,17 +16,28 @@ from app.voz_service import generar_audio
 
 main = Blueprint('main', __name__)
 
+
+def _slugify(value):
+    value = unicodedata.normalize("NFD", str(value or ""))
+    value = "".join(ch for ch in value if unicodedata.category(ch) != "Mn")
+    value = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
+    return value[:120]
+
+
 @main.route("/debug")
 def debug():
     return {"supabase": hasattr(current_app, "supabase"), "openai": hasattr(current_app, "openai_client")}
+
 
 @main.route("/")
 def index():
     return render_template("index.html")
 
+
 @main.route("/api/test")
 def api_test():
     return jsonify({"status": "ok", "mensaje": "Proyecto Dead conectado correctamente"})
+
 
 @main.route("/upload", methods=["GET", "POST"])
 @login_required
@@ -32,32 +46,111 @@ def upload(current_user=None):
         return render_template("upload.html")
     if not hasattr(current_app, "supabase"):
         return "Supabase no configurado", 500
+
     file = request.files.get("image")
     valido, error = validar_archivo_imagen(file)
     if not valido:
         return render_template("upload.html", error=error), 400
-    persona = request.form.get("persona", "").strip()
+
+    # PERSONA es ahora la identidad canónica. El nombre queda únicamente
+    # como compatibilidad para formularios/enlaces legacy.
+    persona_id = (request.form.get("persona_id") or "").strip()
+    persona_nombre = (request.form.get("persona") or "").strip()
     title = request.form.get("title", "").strip()
     description = request.form.get("description", "").strip()
-    valido, error = validar_form_upload(persona, title, description)
+
+    persona = None
+    if persona_id:
+        try:
+            persona_response = (current_app.supabase.table("personas")
+                .select("id,owner_id,nombre,slug")
+                .eq("id", persona_id)
+                .eq("owner_id", str(current_user.id))
+                .limit(1).execute())
+            persona = persona_response.data[0] if persona_response.data else None
+        except Exception as exc:
+            print(f"❌ Error buscando persona: {exc}")
+            return render_template("upload.html", error="No se pudo validar la persona"), 500
+        if not persona:
+            return render_template("upload.html", error="La persona seleccionada no existe"), 404
+    else:
+        # Compatibilidad: los formularios antiguos pueden enviar solo nombre.
+        # Para lo nuevo, el frontend enviará siempre persona_id.
+        if not persona_nombre:
+            return render_template("upload.html", error="Seleccioná una persona"), 400
+        slug = _slugify(persona_nombre)
+        try:
+            existing = (current_app.supabase.table("personas")
+                .select("id,owner_id,nombre,slug")
+                .eq("owner_id", str(current_user.id))
+                .eq("slug", slug).limit(1).execute())
+            persona = existing.data[0] if existing.data else None
+            if not persona:
+                created = (current_app.supabase.table("personas").insert({
+                    "owner_id": str(current_user.id),
+                    "nombre": persona_nombre,
+                    "slug": slug,
+                    "visibilidad": "publica",
+                }).execute())
+                if not created.data:
+                    return render_template("upload.html", error="No se pudo crear la persona"), 500
+                persona = created.data[0]
+                try:
+                    qr_name = generar_qr(f"{request.host_url.rstrip('/')}/p/{persona['id']}")
+                    current_app.supabase.table("personas").update({"qr": qr_name}).eq("id", persona["id"]).execute()
+                except Exception as qr_exc:
+                    print(f"⚠️ Error QR persona: {qr_exc}")
+        except Exception as exc:
+            print(f"❌ Error resolviendo persona legacy: {exc}")
+            return render_template("upload.html", error="No se pudo resolver la persona"), 500
+
+    persona_nombre = persona["nombre"]
+    valido, error = validar_form_upload(persona_nombre, title, description)
     if not valido:
         return render_template("upload.html", error=error), 400
+
     try:
         uid = str(uuid.uuid4())
         filename = guardar_imagen(file)
-        qr_url = f"{request.host_url.rstrip('/')}/experiencia/{uid}"
-        qr_name = generar_qr(qr_url)
-        current_app.supabase.table("experiences").insert({"id": uid, "persona": persona, "title": title, "description": description, "image": filename, "qr": qr_name}).execute()
+
+        # QR de EXPERIENCIA: se conserva exactamente para no romper QR históricos.
+        old_qr_url = f"{request.host_url.rstrip('/')}/experiencia/{uid}"
+        old_qr_name = generar_qr(old_qr_url)
+
+        current_app.supabase.table("experiences").insert({
+            "id": uid,
+            "persona_id": persona["id"],
+            "persona": persona_nombre,
+            "title": title,
+            "description": description,
+            "image": filename,
+            "qr": old_qr_name,
+        }).execute()
+
+        # La memoria nueva queda vinculada a persona_id. El guardado legacy
+        # por nombre se conserva temporalmente para no romper el sistema anterior.
         try:
-            texto = f"{persona} | {title} | {description}"
+            texto = f"{persona_nombre} | {title} | {description}"
             emb = generar_embedding(texto)
-            guardar_memoria(persona, texto, emb)
+            if hasattr(emb, "tolist"):
+                emb = emb.tolist()
+            from app.services.persona_memory_service import guardar_memoria_persona
+            guardar_memoria_persona(persona["id"], texto, emb, tipo="experiencia", origen="upload")
+        except Exception as e:
+            print(f"⚠️ Error memoria canónica: {e}")
+
+        try:
+            texto_legacy = f"{persona_nombre} | {title} | {description}"
+            emb_legacy = generar_embedding(texto_legacy)
+            guardar_memoria(persona_nombre, texto_legacy, emb_legacy)
         except Exception as e:
             print(f"⚠️ Error embedding legacy: {e}")
+
         return redirect("/")
     except Exception as e:
         print(f"❌ Error upload: {e}")
         return render_template("upload.html", error="Error al subir experiencia"), 500
+
 
 @main.route("/api/experiencias")
 def api_experiencias():
@@ -67,6 +160,7 @@ def api_experiencias():
     except Exception as e:
         print(f"❌ Error supabase: {e}")
         return jsonify({"error": "Error al obtener experiencias"}), 500
+
 
 @main.route("/api/experiencia/<id>")
 def api_experiencia(id):
@@ -78,6 +172,7 @@ def api_experiencia(id):
     except Exception as e:
         print(f"❌ Error detalle: {e}")
         return jsonify({"error": "Error interno"}), 500
+
 
 # LEGACY EXPERIENCE: conserva los QR y enlaces históricos /experiencia/<id>.
 @main.route("/experiencia/<id>")
@@ -91,6 +186,7 @@ def experiencia_legacy(id):
         print(f"❌ Error experiencia legacy: {e}")
         return render_template("error.html", message="Error interno del servidor"), 500
 
+
 # LEGACY PERSONA: conserva el acceso por nombre usado por los enlaces antiguos.
 @main.route("/persona/<nombre>")
 def persona_legacy(nombre):
@@ -102,6 +198,7 @@ def persona_legacy(nombre):
     except Exception as e:
         print(f"❌ Error persona legacy: {e}")
         return render_template("error.html", message="Error interno del servidor"), 500
+
 
 # LEGACY CHAT: se mantienen para compatibilidad con usuarios y enlaces existentes.
 @main.route("/chat", methods=["GET", "POST"])
@@ -122,6 +219,7 @@ def chat(current_user=None):
         print(f"❌ Error IA: {e}")
         respuesta = "Error al consultar IA"
     return render_template("chat.html", mensaje=mensaje, respuesta=respuesta)
+
 
 @main.route("/chat_persona/<nombre>", methods=["GET", "POST"])
 @login_required
@@ -177,6 +275,7 @@ No digas que sos IA.
         print(f"⚠️ Error audio: {e}")
     return render_template("chat_persona.html", persona=nombre, respuesta=respuesta, audio=audio_path, message=msg)
 
+
 @main.route("/api/chat/<nombre>", methods=["POST"])
 @login_required
 def api_chat_persona(nombre, current_user=None):
@@ -229,6 +328,7 @@ No digas que sos IA. No rompas el personaje."""
         print(f"⚠️ Error audio: {e}")
     return jsonify({"respuesta": respuesta, "emocion": emocion, "audio": f"/static/audio/{audio_nombre}" if audio_nombre else None})
 
+
 @main.route("/admin")
 @login_required
 def admin(current_user=None):
@@ -239,9 +339,11 @@ def admin(current_user=None):
         print(f"❌ Error admin: {e}")
         return render_template("admin.html", data=[])
 
+
 @main.errorhandler(404)
 def not_found(error):
     return render_template("error.html", message="Página no encontrada"), 404
+
 
 @main.errorhandler(500)
 def internal_error(error):
