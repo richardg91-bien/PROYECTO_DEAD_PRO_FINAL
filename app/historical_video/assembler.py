@@ -1,13 +1,14 @@
 """Orquestacion de escenas y ensamblado final de un video historico."""
 
-from pathlib import Path
+import os
 import subprocess
+from pathlib import Path
 
-from .render import render_scene
-from .voice_pipeline import generar_audio_escena
+from .render import render_scene, resolver_ffmpeg
+from .voice_pipeline import generar_audio_escena, resolver_audio_local
 
 
-def ensamblar_video(plan, visual_paths, output_path, ffmpeg_binary="ffmpeg"):
+def ensamblar_video(plan, visual_paths, output_path, ffmpeg_binary=None):
     """Genera cada escena y concatena los MP4 en el orden del plan.
 
     ``visual_paths`` debe contener exactamente una imagen por escena.
@@ -19,6 +20,7 @@ def ensamblar_video(plan, visual_paths, output_path, ffmpeg_binary="ffmpeg"):
     output.parent.mkdir(parents=True, exist_ok=True)
     scene_dir = output.parent / f"{output.stem}_scenes"
     scene_dir.mkdir(parents=True, exist_ok=True)
+    ffmpeg = ffmpeg_binary or resolver_ffmpeg()
 
     scene_files = []
     for index, (scene, visual_path) in enumerate(zip(plan.scenes, visual_paths), start=1):
@@ -26,16 +28,15 @@ def ensamblar_video(plan, visual_paths, output_path, ffmpeg_binary="ffmpeg"):
         if not audio_url:
             raise RuntimeError(f"Piper no genero audio para la escena {scene.id}")
 
-        audio_path = Path(audio_url.lstrip("/").replace("/", str(Path.sep)))
+        audio_path = resolver_audio_local(audio_url)
         if not audio_path.is_file():
             raise FileNotFoundError(f"Audio no encontrado: {audio_path}")
 
         scene_output = scene_dir / f"scene_{index:03d}.mp4"
         render_scene(
-            visual_path=visual_path,
             audio_path=audio_path,
             output_path=scene_output,
-            ffmpeg_binary=ffmpeg_binary,
+            image_path=visual_path,
         )
         scene_files.append(scene_output)
 
@@ -46,7 +47,7 @@ def ensamblar_video(plan, visual_paths, output_path, ffmpeg_binary="ffmpeg"):
     )
 
     command = [
-        ffmpeg_binary,
+        ffmpeg,
         "-y",
         "-f", "concat",
         "-safe", "0",
@@ -54,5 +55,11 @@ def ensamblar_video(plan, visual_paths, output_path, ffmpeg_binary="ffmpeg"):
         "-c", "copy",
         str(output),
     ]
-    subprocess.run(command, check=True, capture_output=True, text=True)
+    try:
+        subprocess.run(command, check=True, capture_output=True, text=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(f"FFmpeg no pudo ensamblar el video: {exc}") from exc
+
+    if not output.is_file() or output.stat().st_size == 0:
+        raise RuntimeError("FFmpeg no produjo el video final")
     return str(output)
