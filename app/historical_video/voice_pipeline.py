@@ -1,40 +1,40 @@
-"""Adaptador del servicio Piper existente para escenas de video historico."""
+"""Adaptador del servicio de voz existente para escenas de video histórico."""
 
-import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from app.voice.voice_service import sintetizar_voz
+from app.voz_service import generar_audio
 
 
 def generar_audio_escena(scene):
-    """Genera el WAV de una escena usando el Piper canonico de Vision 1."""
-    return sintetizar_voz(scene.narration, scene.emotion)
+    """Genera el audio de una escena usando el servicio de voz existente."""
+    nombre = generar_audio(scene.narration)
+
+    if not nombre:
+        return None
+
+    return f"/static/audio/{nombre}"
 
 
 def resolver_audio_local(audio_url: str) -> Path:
-    """Convierte la URL publica de Piper en una ruta local segura.
-
-    El servicio canonico devuelve URLs como ``/static/audio/nombre.wav``.
-    La ruta fisica real se obtiene desde ``PIPER_OUTPUT_DIR`` para respetar
-    exactamente la configuracion existente de Vision 1.
-    """
+    """Convierte la URL pública de audio en una ruta local segura."""
     if not audio_url:
-        raise ValueError("URL de audio vacia")
+        raise ValueError("URL de audio vacía")
 
     parsed = urlparse(audio_url)
     path = parsed.path or audio_url
-    filename = Path(path).name
-    if not filename or filename in {".", ".."}:
-        raise ValueError("URL de audio invalida")
 
-    configured_dir = os.getenv("PIPER_OUTPUT_DIR", "static/audio").strip() or "static/audio"
-    output_dir = Path(configured_dir)
-    if not output_dir.is_absolute():
-        output_dir = Path.cwd() / output_dir
+    filename = Path(path).name
+
+    if not filename or filename in {".", ".."}:
+        raise ValueError("URL de audio inválida")
+
+    output_dir = Path.cwd() / "static" / "audio"
+    output_dir = output_dir.resolve()
 
     resolved = (output_dir / filename).resolve()
-    root = output_dir.resolve()
-    if resolved.parent != root:
+
+    if resolved.parent != output_dir:
         raise ValueError("Ruta de audio fuera del directorio permitido")
+
     return resolved
