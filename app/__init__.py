@@ -63,7 +63,7 @@ def create_app():
         print("Warning: usando SECRET_KEY de desarrollo. Define SECRET_KEY en produccion.")
 
     # Crear carpetas necesarias
-    for folder in ["static/uploads", "static/qr", "static/audio"]:
+    for folder in ["static/uploads", "static/qr", "static/audio", "static/videos"]:
         os.makedirs(folder, exist_ok=True)
 
     # =========================
@@ -74,5 +74,12 @@ def create_app():
 
     from app.auth_routes import auth_bp
     app.register_blueprint(auth_bp)
+
+    # =========================
+    # HISTORICAL VIDEOS
+    # Exclusivo de la rama historical-videos.
+    # =========================
+    from app.historical_video.routes import historical_video_bp
+    app.register_blueprint(historical_video_bp)
 
     return app
