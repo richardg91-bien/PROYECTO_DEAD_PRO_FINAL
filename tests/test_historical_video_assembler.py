@@ -37,19 +37,25 @@ def test_ensamblar_video_genera_escenas_y_concatena(tmp_path):
     def fake_voice(scene):
         return f"/static/audio/{'one' if scene.id == 's1' else 'two'}.wav"
 
+    def fake_audio_resolver(audio_url):
+        return audio_one if audio_url.endswith("one.wav") else audio_two
+
     def fake_render(audio_path, output_path, image_path):
         Path(output_path).write_bytes(b"mp4")
 
-    class FakeCompleted:
-        pass
+    def fake_ffmpeg(command, **kwargs):
+        Path(command[-1]).write_bytes(b"final-mp4")
 
     with patch("app.historical_video.assembler.generar_audio_escena", side_effect=fake_voice), patch(
-        "app.historical_video.assembler.render_scene", side_effect=fake_render
-    ), patch("app.historical_video.assembler.subprocess.run", return_value=FakeCompleted()):
+        "app.historical_video.assembler.resolver_audio_local", side_effect=fake_audio_resolver
+    ), patch("app.historical_video.assembler.render_scene", side_effect=fake_render), patch(
+        "app.historical_video.assembler.subprocess.run", side_effect=fake_ffmpeg
+    ):
         result = ensamblar_video(plan, visuals, output, ffmpeg_binary="ffmpeg")
 
     assert result == str(output)
-    assert output.parent.exists()
+    assert output.is_file()
+    assert output.stat().st_size > 0
     assert len(list((tmp_path / "final_scenes").glob("scene_*.mp4"))) == 2
     concat = tmp_path / "final_scenes" / "concat.txt"
     assert concat.is_file()
