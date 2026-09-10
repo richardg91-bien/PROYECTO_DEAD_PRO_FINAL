@@ -1,0 +1,7 @@
+file 'C:/Users/richa/OneDrive/Desktop/PROYECTO_DEAD_PRO_FINAL/static/videos/romulo_y_remo_scenes/scene_001.mp4'
+file 'C:/Users/richa/OneDrive/Desktop/PROYECTO_DEAD_PRO_FINAL/static/videos/romulo_y_remo_scenes/scene_002.mp4'
+file 'C:/Users/richa/OneDrive/Desktop/PROYECTO_DEAD_PRO_FINAL/static/videos/romulo_y_remo_scenes/scene_003.mp4'
+file 'C:/Users/richa/OneDrive/Desktop/PROYECTO_DEAD_PRO_FINAL/static/videos/romulo_y_remo_scenes/scene_004.mp4'
+file 'C:/Users/richa/OneDrive/Desktop/PROYECTO_DEAD_PRO_FINAL/static/videos/romulo_y_remo_scenes/scene_005.mp4'
+file 'C:/Users/richa/OneDrive/Desktop/PROYECTO_DEAD_PRO_FINAL/static/videos/romulo_y_remo_scenes/scene_006.mp4'
+file 'C:/Users/richa/OneDrive/Desktop/PROYECTO_DEAD_PRO_FINAL/static/videos/romulo_y_remo_scenes/scene_007.mp4'

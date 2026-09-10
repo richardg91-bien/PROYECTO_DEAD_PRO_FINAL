@@ -32,20 +32,47 @@ def _crear_visual_prompt(sentence: str, subject: str) -> str:
     subject_lower = subject.lower()
     contenido = f"{subject_lower} {sentence_lower}"
 
+    # ------------------------------------------------------------------
+    # DIRECCION ARTISTICA BASE
+    # ------------------------------------------------------------------
+    #
+    # Importante:
+    # Evitamos utilizar "Roma antigua" como elemento visual principal,
+    # porque modelos como SD 1.5 tienden a asociarlo con Coliseo,
+    # ruinas monumentales, legionarios y arquitectura imperial.
+    #
+    # En su lugar describimos directamente:
+    # - Lacio rural
+    # - siglo VIII a.C.
+    # - comunidad italica primitiva
+    # - personas reales
+    # - naturaleza
+    # - construcciones sencillas
+    #
     prompt = (
-        "Reconstruccion historica cinematografica ambientada en el Lacio, "
-        "Italia central, durante el siglo VIII a.C., en la epoca arcaica "
-        "anterior a la Roma imperial. "
-        f"Escena relacionada con {subject}. "
-        f"Representacion visual de: {sentence}. "
-        "Realismo historico y cinematografico, aspecto fotorealista, "
-        "iluminacion natural, composicion de pelicula historica, "
-        "profundidad de campo, texturas realistas y atmosfera epica pero creible. "
-        "Vestimenta, arquitectura, armas, herramientas y materiales propios "
-        "de una comunidad italica arcaica del siglo VIII a.C. "
+        "Photorealistic cinematic historical scene set in rural Latium, "
+        "central Italy, approximately 800 BCE, during the early Iron Age. "
+        "Show real living human beings with natural human faces, realistic "
+        "skin, realistic hair, realistic anatomy and natural body proportions. "
+        "The environment is a small, poor and undeveloped Italic rural community "
+        "surrounded by wild vegetation, wooded hills, grassland and natural terrain. "
+        "Primitive huts made from wooden branches, mud, reeds and thatch may appear "
+        "in the background. "
+        "People wear simple rough wool tunics, leather belts and simple leather "
+        "sandals appropriate for an early Italic community. "
+        "Primitive bronze or iron-age tools and simple weapons only when required "
+        "by the narration. "
+        "Natural sunlight, realistic atmospheric perspective, cinematic framing, "
+        "documentary photography, realistic textures, natural colors, believable "
+        "historical environment, dramatic but realistic lighting, shallow depth "
+        "of field when appropriate, widescreen cinematic composition, 16:9. "
+        f"Main historical subject: {subject}. "
+        f"Visual action represented: {sentence}. "
     )
 
-    # Nacimiento, infancia o Rea Silvia.
+    # ------------------------------------------------------------------
+    # NACIMIENTO / INFANCIA / REA SILVIA
+    # ------------------------------------------------------------------
     if (
         "gemelos" in contenido
         or "nacimiento" in contenido
@@ -53,12 +80,17 @@ def _crear_visual_prompt(sentence: str, subject: str) -> str:
         or "rea silvia" in contenido
     ):
         prompt += (
-            "Mostrar a los hermanos gemelos como recien nacidos. "
-            "Representar la tradicion legendaria de manera sobria y realista, "
-            "sin apariencia de fantasia."
+            "If the narration concerns the birth or infancy of the twins, "
+            "show newborn human babies in a humble ancient Italic setting. "
+            "Use realistic human proportions and natural skin. "
+            "The scene must feel like a serious historical drama rather than "
+            "a fantasy illustration. "
+            "Use simple woven cloth and primitive natural materials. "
         )
 
-    # Rio Tiber y abandono.
+    # ------------------------------------------------------------------
+    # RIO TIBER / ABANDONO
+    # ------------------------------------------------------------------
     elif (
         "tiber" in contenido
         or "tíber" in contenido
@@ -67,34 +99,46 @@ def _crear_visual_prompt(sentence: str, subject: str) -> str:
         or "abandonados" in contenido
     ):
         prompt += (
-            "Mostrar las orillas del antiguo rio Tiber con vegetacion mediterranea, "
-            "juncos, barro, agua y terreno natural del Lacio. "
-            "Evitar cualquier apariencia de ciudad monumental."
+            "Show a completely natural ancient river landscape. "
+            "The Tiber is represented as a wild river surrounded by reeds, "
+            "mud, grasses, trees and undeveloped riverbanks. "
+            "No city is visible. No monumental architecture is visible. "
+            "The landscape must look ancient, rural and untouched. "
         )
 
-    # Loba.
+    # ------------------------------------------------------------------
+    # LOBA
+    # ------------------------------------------------------------------
     elif "loba" in contenido or "amamant" in contenido:
         prompt += (
-            "Mostrar una loba realista junto al Tiber protegiendo y amamantando "
-            "a los dos gemelos. La loba debe tener anatomia animal natural, "
-            "sin antropomorfismo ni apariencia fantastica. "
-            "La escena debe parecer una recreacion cinematografica de una leyenda antigua."
+            "Show a real adult she-wolf with anatomically correct natural animal "
+            "features protecting the two newborn human twins near the river. "
+            "The wolf must look like a real wild animal, not a statue, sculpture, "
+            "mythological creature or fantasy animal. "
+            "The babies must look like real human infants. "
+            "Use a restrained cinematic interpretation of the legendary episode. "
         )
 
-    # Pastor y esposa.
+    # ------------------------------------------------------------------
+    # PASTOR / ESPOSA / CRIANZA
+    # ------------------------------------------------------------------
     elif (
         "pastor" in contenido
         or "esposa" in contenido
         or "criados" in contenido
+        or "criados por" in contenido
     ):
         prompt += (
-            "Mostrar un entorno rural del Lacio antiguo con un pastor y su esposa "
-            "cuidando a los hermanos. Incluir una vivienda sencilla de madera, "
-            "paja y barro, animales domesticos, herramientas rurales y materiales "
-            "propios de una comunidad italica arcaica."
+            "Show a poor rural Italic shepherd family caring for the children. "
+            "Include a simple primitive hut made from wood, mud, reeds and thatch, "
+            "domestic animals, sheep, simple wooden tools and natural materials. "
+            "The people should look like ordinary rural inhabitants of the period, "
+            "not soldiers, nobles or imperial Romans. "
         )
 
-    # Hermanos adultos y fundacion.
+    # ------------------------------------------------------------------
+    # ROMULO Y REMO ADULTOS / CRECIMIENTO
+    # ------------------------------------------------------------------
     elif (
         "crecieron" in contenido
         or "hermanos" in contenido
@@ -102,15 +146,21 @@ def _crear_visual_prompt(sentence: str, subject: str) -> str:
         or "ciudad" in contenido
     ):
         prompt += (
-            "Mostrar a Romulo y Remo como jovenes adultos, hermanos gemelos de "
-            "apariencia coherente entre escenas, fuertes y vestidos como hombres "
-            "de la Italia arcaica: tunicas sencillas de lana, cuero y tejidos "
-            "rusticos, sin armadura de legionarios. "
-            "Paisaje de colinas, valle cercano al Tiber y un asentamiento primitivo "
-            "con chozas de madera, barro y paja."
+            "Show Romulus and Remus as two real young adult twin brothers. "
+            "They should have similar facial characteristics while remaining "
+            "clearly recognizable as two different living human individuals. "
+            "They are strong rural young men from an early Italic community. "
+            "They wear simple rough wool tunics, leather belts and leather sandals. "
+            "Their clothing is practical and primitive, without military uniforms "
+            "or imperial Roman equipment. "
+            "Place them primarily in a natural landscape of wooded hills, grass, "
+            "river valley and primitive huts. "
+            "Keep the visual focus on the two brothers rather than architecture. "
         )
 
-    # Conflicto entre Romulo y Remo.
+    # ------------------------------------------------------------------
+    # CONFLICTO ENTRE LOS HERMANOS
+    # ------------------------------------------------------------------
     if (
         "disputa" in contenido
         or "conflicto" in contenido
@@ -119,37 +169,59 @@ def _crear_visual_prompt(sentence: str, subject: str) -> str:
         or "muerte" in contenido
     ):
         prompt += (
-            " Si la escena representa el conflicto entre los hermanos, mostrar "
-            "tension dramatica sin gore ni violencia grafica. Utilizar expresiones "
-            "faciales, postura corporal y composicion cinematografica para transmitir "
-            "el conflicto. Mantener la indumentaria y apariencia de ambos coherentes."
+            "If the scene represents conflict between the brothers, show dramatic "
+            "tension through facial expressions, body language, distance between "
+            "the characters and cinematic composition. "
+            "Do not show gore or graphic violence. "
+            "Keep both brothers visually consistent and dressed as early Italic "
+            "rural warriors rather than Roman imperial soldiers. "
         )
 
-    # Fundacion de Roma.
+    # ------------------------------------------------------------------
+    # FUNDACION / ASENTAMIENTO PRIMITIVO
+    # ------------------------------------------------------------------
     if (
         "roma" in contenido
         or "fundacion" in contenido
         or "fundar una ciudad" in contenido
     ):
         prompt += (
-            " Mostrar un asentamiento primitivo sobre una colina del Lacio, "
-            "con construcciones sencillas de madera, barro, paja y piedra sin labrar, "
-            "senderos de tierra y paisaje mediterraneo. No representar monumentos "
-            "de la Roma imperial ni arquitectura monumental posterior."
+            "If a settlement is required, show only a very small primitive "
+            "hilltop settlement of early Italic people. "
+            "Use wooden huts, mud walls, thatched roofs, rough uncut stones, "
+            "dirt paths and simple wooden fences. "
+            "The settlement must look like a small prehistoric or early Iron Age "
+            "village, not a city. "
+            "Do not show monumental architecture. "
+            "The surrounding landscape must dominate the image. "
         )
 
-    # Restricciones generales para IA.
+    # ------------------------------------------------------------------
+    # NEGATIVE PROMPT / RESTRICCIONES
+    # ------------------------------------------------------------------
+    #
+    # Se incluyen en ingles porque el modelo SD 1.5 suele responder mejor
+    # a este tipo de restricciones.
+    #
     prompt += (
-        " Evitar completamente la apariencia de la Roma imperial o de un ejercito "
-        "romano posterior: no legionarios, no centuriones, no lorica segmentata, "
-        "no cascos imperiales, no grandes escudos legionarios, no Coliseo, no foros "
-        "de marmol, no columnas monumentales, no edificios imperiales, no ruinas "
-        "monumentales. No incluir elementos modernos, vehiculos, electricidad, "
-        "carreteras modernas, ropa moderna, armas modernas, tecnologia, texto, "
-        "subtitulos, logotipos ni marcas de agua. No introducir personajes o "
-        "acontecimientos que contradigan la narracion proporcionada. "
-        "La imagen debe representar claramente la accion principal de la escena, "
-        "con encuadre cinematografico panoramico 16:9."
+        "ABSOLUTELY AVOID: "
+        "statue, sculpture, stone statue, marble statue, bronze statue, "
+        "monument, bust, carved figure, museum artifact, classical sculpture, "
+        "painting, drawing, illustration, fantasy art, CGI character, "
+        "Colosseum, amphitheater, Roman forum, monumental temple, palace, "
+        "marble columns, giant arches, monumental ruins, Roman ruins, "
+        "imperial Roman architecture, Roman Empire, imperial Rome, "
+        "Roman legionary, centurion, Roman legion, legion armor, "
+        "lorica segmentata, imperial helmet, large legionary shield, "
+        "Roman military uniform, gladiator, "
+        "modern buildings, modern city, roads, electricity, vehicles, "
+        "modern clothing, modern weapons, technology, "
+        "text, letters, subtitles, logo, watermark. "
+        "Do not introduce historical elements from later Roman periods. "
+        "Do not transform the people into statues or sculptures. "
+        "The subjects must be living real human beings. "
+        "The image must focus on the main action described by the narration. "
+        "Wide cinematic 16:9 composition."
     )
 
     return prompt
