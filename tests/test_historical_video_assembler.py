@@ -7,8 +7,18 @@ from app.historical_video.models import HistoricalScene, HistoricalVideoPlan
 
 def test_ensamblar_video_genera_escenas_y_concatena(tmp_path):
     scenes = [
-        HistoricalScene(id="s1", title="Uno", narration="Primera escena"),
-        HistoricalScene(id="s2", title="Dos", narration="Segunda escena"),
+        HistoricalScene(
+            id="s1",
+            title="Uno",
+            narration="Primera escena",
+            visual_prompt="Escena histórica de apertura.",
+        ),
+        HistoricalScene(
+            id="s2",
+            title="Dos",
+            narration="Segunda escena",
+            visual_prompt="Segunda escena histórica.",
+        ),
     ]
     plan = HistoricalVideoPlan(title="Prueba", subject="Evento", scenes=scenes)
     visuals = [tmp_path / "one.jpg", tmp_path / "two.jpg"]
@@ -27,7 +37,7 @@ def test_ensamblar_video_genera_escenas_y_concatena(tmp_path):
     def fake_voice(scene):
         return f"/static/audio/{'one' if scene.id == 's1' else 'two'}.wav"
 
-    def fake_render(visual_path, audio_path, output_path, ffmpeg_binary="ffmpeg"):
+    def fake_render(audio_path, output_path, image_path):
         Path(output_path).write_bytes(b"mp4")
 
     class FakeCompleted:
